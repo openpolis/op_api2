@@ -1,0 +1,6 @@
+*.pyc
+*.sqlite
+.idea/
+settings_local.py
+log/*
+apache
