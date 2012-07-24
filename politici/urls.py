@@ -1,10 +1,10 @@
 from django.conf.urls import patterns, include
 from tastypie.api import Api
 
-from op.v1.api import LocationResource, LocationTypeResource, ProfessionResource, PoliticianResource, ResourceResource,\
+from politici.v2.api import LocationResource, LocationTypeResource, ProfessionResource, PoliticianResource, ResourceResource,\
 EducationLevelResource, InstitutionChargeResource, PoliticalChargeResource, OrganizationChargeResource
 
-v1_api = Api(api_name='v1')
+v1_api = Api(api_name='v2')
 v1_api.register(LocationResource())
 v1_api.register(LocationTypeResource())
 v1_api.register(PoliticianResource())

@@ -27,7 +27,7 @@ class OpLocationType(models.Model):
 
 class OpLocationManager(models.Manager):
   def retrieveFromId(self, id_type, city_id):
-      """return OpLocation object from an ID (op, istat or minint)"""
+      """return OpLocation object from an ID (politici, istat or minint)"""
 
       if id_type == 'op_id':
           return self.retrieveFromOpId(city_id)
@@ -109,7 +109,7 @@ class OpLocation(models.Model):
     def getProvince(self):
         if self.location_type.name != 'Comune':
             raise Exception("This method can be called only for cities")
-        return OpLocation.objects.db_manager('op').get(
+        return OpLocation.objects.db_manager('politici').get(
             location_type__name='Provincia', 
             provincial_id=self.provincial_id
         )
@@ -117,7 +117,7 @@ class OpLocation(models.Model):
     def getRegion(self):
         if self.location_type.name != 'Comune':
             raise Exception("This method can be called only for cities")
-        return OpLocation.objects.db_manager('op').get(
+        return OpLocation.objects.db_manager('politici').get(
             location_type__name='Regione', 
             regional_id=self.regional_id
         )
@@ -126,7 +126,7 @@ class OpLocation(models.Model):
         """docstring for getConstituency"""
         if prov_id is None:
             prov_id = self.getProvince().id      
-        return OpConstituency.objects.db_manager('op').get(
+        return OpConstituency.objects.db_manager('politici').get(
             election_type__name=election_type,
             opconstituencylocation__location__id=prov_id
         )
@@ -134,7 +134,7 @@ class OpLocation(models.Model):
     def getNationalReps(self, election_type, prov_id=None):
         """docstring for getNationalReps"""
         constituency = self.getConstituency(election_type, prov_id)
-        charges = OpInstitutionCharge.objects.db_manager('op').filter(
+        charges = OpInstitutionCharge.objects.db_manager('politici').filter(
             date_end=None, 
             constituency__id=constituency.id,
             content__deleted_at=None
@@ -155,7 +155,7 @@ class OpLocation(models.Model):
     
     def getLocalReps(self, institution_name):
         """docstring for getLocalReps"""
-        charges = OpInstitutionCharge.objects.db_manager('op').filter(
+        charges = OpInstitutionCharge.objects.db_manager('politici').filter(
             institution__name=institution_name,
             location__id=self.id,
             date_end=None,
@@ -252,7 +252,7 @@ class OpProfession(models.Model):
     
     def getNormalizedDescription(self):
         if self.oid is not None:
-            norm = OpProfession.objects.db_manager('op').get(pk=self.oid)
+            norm = OpProfession.objects.db_manager('politici').get(pk=self.oid)
             return norm.description
         else:
             return self.description
@@ -301,17 +301,17 @@ class OpPolitician(models.Model):
     def getInstitutionCharges(self, type=None):
         """docstring for getInstitutionCharges"""
         if type == 'current':
-            pol_charges = self.opinstitutioncharge_set.db_manager('op').filter(
+            pol_charges = self.opinstitutioncharge_set.db_manager('politici').filter(
                 date_end__isnull=True,
                 content__deleted_at__isnull=True,
             ).order_by('-date_start')
         elif type == 'past':
-            pol_charges = self.opinstitutioncharge_set.db_manager('op').filter(
+            pol_charges = self.opinstitutioncharge_set.db_manager('politici').filter(
                 date_end__isnull=False,
                 content__deleted_at__isnull=True,
             ).order_by('-date_end')
         else:
-            pol_charges = self.opinstitutioncharge_set.db_manager('op').filter(
+            pol_charges = self.opinstitutioncharge_set.db_manager('politici').filter(
                 content__deleted_at__isnull=True,
             )
         charges = []
@@ -334,17 +334,17 @@ class OpPolitician(models.Model):
     def getPoliticalCharges(self, type=None):
         """get current or past political charges"""
         if type == 'current':
-            pol_charges = self.oppoliticalcharge_set.db_manager('op').filter(
+            pol_charges = self.oppoliticalcharge_set.db_manager('politici').filter(
                 date_end__isnull=True,
                 content__deleted_at__isnull=True,
             ).order_by('-date_start')
         elif type == 'past':
-            pol_charges = self.oppoliticalcharge_set.db_manager('op').filter(
+            pol_charges = self.oppoliticalcharge_set.db_manager('politici').filter(
                 date_end__isnull=False,
                 content__deleted_at__isnull=True,
             ).order_by('-date_end')
         else:
-            pol_charges = self.oppoliticalcharge_set.db_manager('op').filter(
+            pol_charges = self.oppoliticalcharge_set.db_manager('politici').filter(
                 content__deleted_at__isnull=True,
             ).order_by('-date_end')
         charges = []
@@ -365,17 +365,17 @@ class OpPolitician(models.Model):
     def getOrganizationCharges(self, type=None):
         """get current or past political charges"""
         if type == 'current':
-            pol_charges = self.oporganizationcharge_set.db_manager('op').filter(
+            pol_charges = self.oporganizationcharge_set.db_manager('politici').filter(
                 date_end__isnull=True,
                 content__deleted_at__isnull=True,
             ).order_by('-date_start')
         elif type == 'past':
-            pol_charges = self.oporganizationcharge_set.db_manager('op').filter(
+            pol_charges = self.oporganizationcharge_set.db_manager('politici').filter(
                 date_end__isnull=False,
                 content__deleted_at__isnull=True,
             ).order_by('-date_end')
         else:
-            pol_charges = self.oporganizationcharge_set.db_manager('op').filter(
+            pol_charges = self.oporganizationcharge_set.db_manager('politici').filter(
                 content__deleted_at__isnull=True,
             ).order_by('-date_end')
         charges = []
@@ -410,7 +410,7 @@ class OpEducationLevel(models.Model):
         
     def getNormalizedDescription(self):
         if self.oid is not None:
-            norm = OpEducationLevel.objects.db_manager('op').get(pk=self.oid)
+            norm = OpEducationLevel.objects.db_manager('politici').get(pk=self.oid)
             return norm.description
         else:
             return self.description
@@ -496,7 +496,7 @@ class OpParty(models.Model):
     def getNormalized(self):
         """look up for normalized partied in the db"""
         if self.oid is not None and self.oid != 0:
-            return OpParty.objects.db_manager('op').get(pk=self.oid)
+            return OpParty.objects.db_manager('politici').get(pk=self.oid)
         else:
             return self
     
@@ -551,7 +551,7 @@ class OpGroup(models.Model):
     def getNormalized(self):
         """look up for normalized group in the db"""
         if self.oid is not None and self.oid != 0:
-            return OpGroup.objects.db_manager('op').get(pk=self.oid)
+            return OpGroup.objects.db_manager('politici').get(pk=self.oid)
         else:
             return self
     
@@ -598,7 +598,7 @@ class OpInstitutionChargeManager(models.Manager):
     
     def get_statistics(self, request):
         from django.db import connection
-        cursor = connections['op'].cursor()
+        cursor = connections['politici'].cursor()
         
         base_sql = """
             from op_institution_charge ic, op_institution i, op_open_content oc, op_politician p, 
@@ -629,7 +629,7 @@ class OpInstitutionChargeManager(models.Manager):
           location_type = request.GET['location_type']
         if location_id != 0:
           if location_type in location_types:
-            location = OpLocation.objects.db_manager('op').getFromTypeId(location_type, location_id)
+            location = OpLocation.objects.db_manager('politici').getFromTypeId(location_type, location_id)
             clauses_sql += " and l.%s_id=%%s " % location_type
             clauses_params.append(location_id)
             filters['location_context'] = { 'type': location_type, 'id': location_id, 'name': location.name, 'op_location_id': location.id }
@@ -686,7 +686,7 @@ class OpInstitutionChargeManager(models.Manager):
             raise Exception('wrong institution parameter: %s not in (giunta_regionale, consiglio_regionale, ...)' % institution)
             
         professions = {}
-        for profession in OpProfession.objects.db_manager('op').getBasic().values('id', 'description', 'odescription'):
+        for profession in OpProfession.objects.db_manager('politici').getBasic().values('id', 'description', 'odescription'):
           if profession['odescription']:
             professions[profession['id']] = profession['odescription']
           else:
@@ -703,7 +703,7 @@ class OpInstitutionChargeManager(models.Manager):
             raise Exception('wrong institution parameter: %s not in professions_ids' % profession_id)
             
         educations = {}
-        for education in OpEducationLevel.objects.db_manager('op').getBasic().values('id', 'description'):
+        for education in OpEducationLevel.objects.db_manager('politici').getBasic().values('id', 'description'):
           educations[education['id']] = education['description']
         education_id = 0
         if 'education_id' in request.GET:
@@ -789,7 +789,7 @@ class OpInstitutionChargeManager(models.Manager):
           
           
         institution_numbers = {}
-        for inst in OpInstitution.objects.using('op').all().values('id', 'name'):
+        for inst in OpInstitution.objects.using('politici').all().values('id', 'name'):
           if 'giunta' in inst['name'].lower() or 'consiglio' in inst['name'].lower() or 'commissariamento' in inst['name'].lower():
             institution_numbers[inst['id']] = { 'name': inst['name'], 'count': 0 }
         if institution == 0:
@@ -811,7 +811,7 @@ class OpInstitutionChargeManager(models.Manager):
           
           
         profession_numbers = {}
-        for profession in OpProfession.objects.db_manager('op').getBasic().values('id', 'odescription'):
+        for profession in OpProfession.objects.db_manager('politici').getBasic().values('id', 'odescription'):
           profession_numbers[profession['id']] = { 'name': profession['odescription'], 'count': 0 }
         if profession_id == 0:
           profession_sql = """select pr.id, pr.oid, count(*) as n
@@ -834,7 +834,7 @@ class OpInstitutionChargeManager(models.Manager):
           
           
         education_numbers = {}
-        for education in OpEducationLevel.objects.db_manager('op').getBasic().values('id', 'description'):
+        for education in OpEducationLevel.objects.db_manager('politici').getBasic().values('id', 'description'):
           education_numbers[education['id']] = { 'name': education['description'], 'count': 0 }
         if education_id == 0:
           education_sql = """select e.id, e.oid, count(*) as n

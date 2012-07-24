@@ -1,7 +1,7 @@
 from django.db.models.aggregates import Count
 from tastypie import fields
 from tastypie.resources import Resource, ModelResource
-from opp.models import OppActHistoryCache
+from parlamento.models import OppActHistoryCache
 
 
 class CacheDateObject(object):
@@ -38,13 +38,13 @@ class ActCacheDatesResource(Resource):
 
 
     def get_object_list(self, request):
-        queryset = OppActHistoryCache.objects.using('opp').values('data').annotate(Count('data')).order_by('-data')
+        queryset = OppActHistoryCache.objects.using('parlamento').values('data').annotate(Count('data')).order_by('-data')
         results = []
         for r in queryset:
             new_obj = self._meta.object_class()
             new_obj.data = r['data']
             new_obj.data_count = r['data__count']
-            new_obj.acts_url = "http://localhost:8001/opp/v1/history/acts?data__exact=%s&format=json" % r['data']
+            new_obj.acts_url = "http://localhost:8001/parlamento/v2/history/acts?data__exact=%s&format=json" % r['data']
             results.append(new_obj)
         return results
 
@@ -58,7 +58,7 @@ class ActCacheDatesResource(Resource):
 
 class ActCacheResource(ModelResource):
     class Meta:
-        queryset = OppActHistoryCache.objects.using('opp')
+        queryset = OppActHistoryCache.objects.using('parlamento')
         resource_name = 'history/acts'
         allowed_methods = ['get']
         ordering = ('indice',)

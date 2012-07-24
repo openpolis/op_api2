@@ -19,13 +19,13 @@ DATABASES = {
         'NAME': 'op_api2_auth.sqlite',
         'ENGINE': 'django.db.backends.sqlite3',
     },
-    'opp': {
+    'parlamento': {
         'NAME': 'op_openparlamento',
         'ENGINE': 'django.db.backends.mysql',
         'USER': '',
         'PASSWORD': ''
     },
-    'op': {
+    'politici': {
         'NAME': 'op_openpolis',
         'ENGINE': 'django.db.backends.mysql',
         'USER': '',
@@ -119,8 +119,8 @@ INSTALLED_APPS = (
     'django.contrib.staticfiles',
     'django_extensions',
     'tastypie',
-    'opp',
-    'op',
+    'parlamento',
+    'politici',
     # Uncomment the next line to enable the admin:
     'django.contrib.admin',
     # Uncomment the next line to enable admin documentation:
