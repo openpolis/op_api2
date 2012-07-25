@@ -8,9 +8,9 @@
 # into your database.
 
 from django.db import models
+from django.contrib.contenttypes import generic
 
 class OppActHistoryCache(models.Model):
-    id = models.IntegerField(primary_key=True)
     legislatura = models.IntegerField(null=True, blank=True)
     data = models.DateField(unique=True)
     indice = models.FloatField(null=True, blank=True, help_text="Index of relevancy for the act, computed at the given date")
@@ -27,7 +27,6 @@ class OppActHistoryCache(models.Model):
         managed = False
 
 class OppPoliticianHistoryCache(models.Model):
-    id = models.IntegerField(primary_key=True)
     legislatura = models.IntegerField(null=True, blank=True)
     data = models.DateField(unique=True)
     assenze = models.FloatField(null=True, blank=True)
@@ -57,7 +56,6 @@ class OppPoliticianHistoryCache(models.Model):
         managed = False
 
 class OppTagHistoryCache(models.Model):
-    id = models.IntegerField(primary_key=True)
     legislatura = models.IntegerField(null=True, blank=True)
     data = models.DateField(unique=True)
     indice = models.FloatField(null=True, blank=True)
@@ -70,6 +68,167 @@ class OppTagHistoryCache(models.Model):
     class Meta:
         db_table = u'opp_tag_history_cache'
         managed = False
+
+
+class OppTipoAtto(models.Model):
+    denominazione = models.CharField(max_length=60, blank=True)
+    descrizione = models.CharField(max_length=60, blank=True)
+    spiegazione = models.TextField(blank=True)
+    class Meta:
+        db_table = u'opp_tipo_atto'
+        managed = False
+
+class OppAtto(models.Model):
+    parlamento_id = models.IntegerField(null=True, blank=True)
+    tipo_atto = models.ForeignKey(OppTipoAtto)
+    ramo = models.CharField(max_length=1, blank=True)
+    numfase = models.CharField(max_length=255, blank=True)
+    legislatura = models.IntegerField(null=True, blank=True)
+    data_pres = models.DateField(null=True, blank=True)
+    data_agg = models.DateField(null=True, blank=True)
+    titolo = models.TextField(blank=True)
+    iniziativa = models.IntegerField(null=True, blank=True)
+    completo = models.IntegerField(null=True, blank=True)
+    descrizione = models.TextField(blank=True)
+    seduta = models.IntegerField(null=True, blank=True)
+    pred = models.IntegerField(null=True, blank=True)
+    succ = models.IntegerField(null=True, blank=True)
+    voto_medio = models.FloatField(null=True, blank=True)
+    nb_commenti = models.IntegerField()
+    created_at = models.DateTimeField(null=True, blank=True)
+    stato_cod = models.CharField(max_length=2, blank=True)
+    stato_fase = models.CharField(max_length=255, blank=True)
+    stato_last_date = models.DateTimeField(null=True, blank=True)
+    n_monitoring_users = models.IntegerField()
+    ut_fav = models.IntegerField()
+    ut_contr = models.IntegerField()
+    n_interventi = models.IntegerField()
+    titolo_aggiuntivo = models.TextField(blank=True)
+    is_main_unified = models.IntegerField()
+    is_omnibus = models.IntegerField()
+    md5 = models.CharField(max_length=255, blank=True)
+
+    firmatari = models.ManyToManyField('OppCarica', through='OppCaricaHasAtto', related_name='atti_firmati')
+
+    class Meta:
+        db_table = u'opp_atto'
+        managed = False
+
+class OppSede(models.Model):
+    codice = models.CharField(max_length=255, blank=True)
+    ramo = models.CharField(max_length=255, blank=True)
+    denominazione = models.CharField(max_length=255, blank=True)
+    legislatura = models.IntegerField(null=True, blank=True)
+    tipologia = models.CharField(max_length=255, blank=True)
+    class Meta:
+        db_table = u'opp_sede'
+        managed = False
+
+class OppPolitico(models.Model):
+    nome = models.CharField(max_length=30, blank=True)
+    cognome = models.CharField(max_length=30, blank=True)
+    n_monitoring_users = models.IntegerField()
+    sesso = models.CharField(max_length=1, blank=True)
+
+    def __unicode__(self):
+        return u"{0} {1}".format(self.nome, self.cognome)
+
+    class Meta:
+        db_table = u'opp_politico'
+        managed = False
+
+
+class OppTipoCarica(models.Model):
+    nome = models.CharField(max_length=255, blank=True)
+    class Meta:
+        db_table = u'opp_tipo_carica'
+        managed = False
+
+
+class OppCarica(models.Model):
+    politico = models.ForeignKey(OppPolitico)
+    tipo_carica = models.ForeignKey(OppTipoCarica)
+    carica = models.CharField(max_length=30, blank=True)
+    data_inizio = models.DateField(null=True, blank=True)
+    data_fine = models.DateField(null=True, blank=True)
+    legislatura = models.IntegerField(null=True, blank=True)
+    circoscrizione = models.CharField(max_length=60, blank=True)
+    presenze = models.IntegerField(null=True, blank=True)
+    assenze = models.IntegerField(null=True, blank=True)
+    missioni = models.IntegerField(null=True, blank=True)
+    parliament_id = models.IntegerField(null=True, blank=True)
+    indice = models.FloatField(null=True, blank=True)
+    scaglione = models.IntegerField(null=True, blank=True)
+    posizione = models.IntegerField(null=True, blank=True)
+    media = models.FloatField(null=True, blank=True)
+    created_at = models.DateTimeField(null=True, blank=True)
+    ribelle = models.IntegerField(null=True, blank=True)
+    maggioranza_sotto = models.IntegerField()
+    maggioranza_sotto_assente = models.IntegerField()
+    maggioranza_salva = models.IntegerField()
+    maggioranza_salva_assente = models.IntegerField()
+    class Meta:
+        db_table = u'opp_carica'
+        managed = False
+
+class OppCaricaHasAtto(models.Model):
+
+    FATTORE_FIRMA = {
+        'P': 1.0,
+        'R': 1.0,
+        'C': 0.1,
+        'I': 0.01,
+    }
+    atto = models.ForeignKey(OppAtto)
+    carica = models.ForeignKey(OppCarica)
+    tipo = models.CharField(max_length=255)
+    data = models.DateField(null=True, blank=True)
+    url = models.TextField(blank=True)
+    created_at = models.DateTimeField(null=True, blank=True)
+    delete_at = models.DateField(null=True, blank=True)
+    class Meta:
+        db_table = u'opp_carica_has_atto'
+        managed = False
+
+class OppIntervento(models.Model):
+    atto = models.ForeignKey(OppAtto)
+    carica = models.ForeignKey(OppCarica)
+    tipologia = models.CharField(max_length=255, blank=True)
+    url = models.TextField(blank=True)
+    data = models.DateField(null=True, blank=True)
+    sede = models.ForeignKey(OppSede)
+    numero = models.IntegerField(null=True, blank=True)
+    ap = models.IntegerField(null=True, blank=True)
+    created_at = models.DateTimeField(null=True, blank=True)
+    ut_fav = models.IntegerField()
+    ut_contr = models.IntegerField()
+    class Meta:
+        db_table = u'opp_intervento'
+        managed = False
+
+
+class SfTag(models.Model):
+    name = models.CharField(max_length=255, unique=True, blank=True)
+    is_triple = models.IntegerField(null=True, blank=True)
+    triple_namespace = models.CharField(max_length=100, blank=True)
+    triple_key = models.CharField(max_length=100, blank=True)
+    triple_value = models.CharField(max_length=255, blank=True)
+    is_tmp = models.IntegerField()
+    n_monitoring_users = models.IntegerField()
+    class Meta:
+        db_table = u'sf_tag'
+        managed = False
+
+class SfTagging(models.Model):
+    tag = models.ForeignKey(SfTag)
+    taggable_model = models.CharField(max_length=30, blank=True)
+    taggable_id = models.IntegerField(null=True, blank=True)
+    user_id = models.IntegerField(null=True, blank=True)
+    created_at = models.DateTimeField(null=True, blank=True)
+    class Meta:
+        db_table = u'sf_tagging'
+        managed = False
+
 
 """
 class DeppApiKeys(models.Model):
