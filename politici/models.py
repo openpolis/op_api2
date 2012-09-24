@@ -7,7 +7,7 @@ from django.utils.encoding import smart_unicode
 
 
 def dict_fetchall(cursor):
-    "Returns all rows from a cursor as a dict"
+    """Returns all rows from a cursor as a dict"""
     desc = cursor.description
     return [
         dict(zip([col[0] for col in desc], row))
