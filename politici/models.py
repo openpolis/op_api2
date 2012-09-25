@@ -25,54 +25,72 @@ class OpLocationType(models.Model):
       return self.name
 
 
+class OpLocationQuerySet(models.query.QuerySet):
+
+    def regioni(self):
+        return self.filter(location_type_id=4)
+
+    def province(self):
+        return self.filter(location_type_id=5)
+
+    def comuni(self):
+        return self.filter(location_type_id=6)
+
 class OpLocationManager(models.Manager):
-  def retrieveFromId(self, id_type, city_id):
-      """return OpLocation object from an ID (politici, istat or minint)"""
 
-      if id_type == 'op_id':
-          return self.retrieveFromOpId(city_id)
-      elif id_type == 'istat_id':
-          return self.retrieveFromIstatId(city_id)
-      elif id_type == 'minint_id':
-          return self.retrieveFromMinintId(city_id)
-      else:
-          raise Exception('wrong id type: %s use op_id, istat_id or minint_id' % (id_type,))
+    def get_query_set(self, *args, **kwargs):
+        return OpLocationQuerySet(self.model, using=self._db)
 
-  def retrieveFromOpId(self, op_id):
-      """return an OpLocation object from the openpolis id"""
-      return self.get(pk=op_id, location_type__id=6)
+    def regioni(self): return self.get_query_set().province()
+    def province(self): return self.get_query_set().province()
+    def comuni(self): return self.get_query_set().province()
 
-  def retrieveFromIstatId(self, city_id):
-      """return an OpLocation object, from the istat city_id"""
-      return self.get(city_id=city_id)
+    def retrieveFromId(self, id_type, city_id):
+        """return OpLocation object from an ID (politici, istat or minint)"""
+        if id_type == 'op_id':
+            return self.retrieveFromOpId(city_id)
+        elif id_type == 'istat_id':
+            return self.retrieveFromIstatId(city_id)
+        elif id_type == 'minint_id':
+            return self.retrieveFromMinintId(city_id)
+        else:
+            raise Exception('wrong id type: %s use op_id, istat_id or minint_id' % (id_type,))
 
-  def retrieveFromMinintId(self, minint_id):
-      """
-      return an OpLocation object, from the minint codes
-      minint codes is packed: 2A3A4A
-      the argument length is validated
-      codes are unpacked from the argument
-      """
-      if len(minint_id) != 9:
-          raise Exception('minint_id code must be exactly 9 characters long: %s is %s char-long' % (minint_id, len(minint_id),))
-      regional_code = int(minint_id[:2])
-      provincial_code = int(minint_id[2:5])
-      city_code = int(minint_id[5:])
-      return self.get(minint_regional_code=regional_code,
-                      minint_provincial_code=provincial_code,
-                      minint_city_code=city_code)
+    def retrieveFromOpId(self, op_id):
+        """return an OpLocation object from the openpolis id"""
+        return self.get(pk=op_id, location_type__id=6)
 
-  def getFromTypeId(self, location_type, location_id):
-      if (location_type == 'regional'):
-          locations = self.filter(location_type__name__iexact='regione', regional_id=location_id)
-      elif (location_type == 'provincial'):
-          locations = self.filter(location_type__name__iexact='provincia', provincial_id=location_id)
-      elif (location_type == 'city'):
-          locations = self.filter(location_type__name__iexact='comune', city_id=location_id)
-      else:
-          raise Exception('wrong location_type parameters %s not in (regional, provincial, city)' % location_type)
+    def retrieveFromIstatId(self, city_id):
+        """return an OpLocation object, from the istat city_id"""
+        return self.get(city_id=city_id)
 
-      return locations[0]
+    def retrieveFromMinintId(self, minint_id):
+        """
+        return an OpLocation object, from the minint codes
+        minint codes is packed: 2A3A4A
+        the argument length is validated
+        codes are unpacked from the argument
+        """
+        if len(minint_id) != 9:
+            raise Exception('minint_id code must be exactly 9 characters long: %s is %s char-long' % (minint_id, len(minint_id),))
+        regional_code = int(minint_id[:2])
+        provincial_code = int(minint_id[2:5])
+        city_code = int(minint_id[5:])
+        return self.get(minint_regional_code=regional_code,
+            minint_provincial_code=provincial_code,
+            minint_city_code=city_code)
+
+    def getFromTypeId(self, location_type, location_id):
+        if (location_type == 'regional'):
+            locations = self.filter(location_type__name__iexact='regione', regional_id=location_id)
+        elif (location_type == 'provincial'):
+            locations = self.filter(location_type__name__iexact='provincia', provincial_id=location_id)
+        elif (location_type == 'city'):
+            locations = self.filter(location_type__name__iexact='comune', city_id=location_id)
+        else:
+            raise Exception('wrong location_type parameters %s not in (regional, provincial, city)' % location_type)
+
+        return locations[0]
 
 
 

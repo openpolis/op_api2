@@ -2,20 +2,22 @@ from django.conf.urls import patterns, include
 from tastypie.api import Api
 
 from politici.v2.api import LocationResource, LocationTypeResource, ProfessionResource, PoliticianResource, ResourceResource,\
-EducationLevelResource, InstitutionChargeResource, PoliticalChargeResource, OrganizationChargeResource, InstitutionResource
+EducationLevelResource, InstitutionChargeResource, PoliticalChargeResource, OrganizationChargeResource, InstitutionResource, \
+DeputiesResource
 
-v1_api = Api(api_name='v2')
-v1_api.register(LocationResource())
-v1_api.register(LocationTypeResource())
-v1_api.register(PoliticianResource())
-v1_api.register(ProfessionResource())
-v1_api.register(EducationLevelResource())
-v1_api.register(ResourceResource())
-v1_api.register(InstitutionResource())
-v1_api.register(InstitutionChargeResource())
-v1_api.register(PoliticalChargeResource())
-v1_api.register(OrganizationChargeResource())
+v2_api = Api(api_name='v2')
+v2_api.register(LocationResource())
+v2_api.register(LocationTypeResource())
+v2_api.register(PoliticianResource())
+v2_api.register(ProfessionResource())
+v2_api.register(EducationLevelResource())
+v2_api.register(ResourceResource())
+v2_api.register(InstitutionResource())
+v2_api.register(InstitutionChargeResource())
+v2_api.register(PoliticalChargeResource())
+v2_api.register(OrganizationChargeResource())
+v2_api.register(DeputiesResource())
 
 urlpatterns = patterns('',
-    (r'^', include(v1_api.urls)),
+    (r'^', include(v2_api.urls)),
 )
