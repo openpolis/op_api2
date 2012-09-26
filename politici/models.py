@@ -133,22 +133,34 @@ class OpLocation(models.Model):
         )
     
     def getRegion(self):
-        if self.location_type.name != 'Comune':
+        if self.location_type.name not in ('Comune','Provincia'):
             raise Exception("This method can be called only for cities")
         return OpLocation.objects.db_manager('politici').get(
-            location_type__name='Regione', 
+            provincial_id__isnull=True,
             regional_id=self.regional_id
         )
     
-    def getConstituency(self, election_type, prov_id=None):
+    def getConstituencies(self, election_type=None, prov_id=None):
         """docstring for getConstituency"""
         if prov_id is None:
-            prov_id = self.getProvince().id      
-        return OpConstituency.objects.db_manager('politici').get(
-            election_type__name=election_type,
-            opconstituencylocation__location__id=prov_id
-        )
-        
+            prov_id = self.getProvince().id
+
+        kwargs = {
+            'opconstituencylocation__location_id': prov_id
+        }
+        if election_type:
+            if isinstance(election_type, int):
+                kwargs['election_type__id']= election_type
+            else:
+                kwargs['election_type__name']= election_type
+        return OpConstituency.objects.db_manager('politici').filter(**kwargs)
+
+    def getConstituency(self, election_type, prov_id=None):
+        try:
+            return self.getConstituencies(election_type, prov_id)[0]
+        except IndexError:
+            raise OpConstituency.DoesNotExist
+
     def getNationalReps(self, election_type, prov_id=None):
         """docstring for getNationalReps"""
         constituency = self.getConstituency(election_type, prov_id)

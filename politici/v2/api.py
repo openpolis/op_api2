@@ -1,9 +1,8 @@
-from django.conf.urls import url
-from django.conf import settings
+from django.db.models.query_utils import Q
 from tastypie import fields
 from tastypie.resources import ModelResource, ALL, ALL_WITH_RELATIONS, Resource
 from politici.models import OpLocation, OpLocationType, OpProfession, OpResources, OpPolitician, OpResourcesType, OpEducationLevel, OpInstitutionCharge, OpPoliticalCharge, OpOrganizationCharge, OpInstitution
-
+from tastypie.exceptions import NotFound
 
 class LocationTypeResource(ModelResource):
     class Meta:
@@ -86,12 +85,14 @@ class InstitutionResource(ModelResource):
     class Meta:
         queryset = OpInstitution.objects.using('politici').all()
         resource_name = 'istituzioni'
-        excludes = ['priority',]
+        excludes = ['priority','short_name']
         allowed_methods = ['get']
+        ordering = ['priority']
 
 class InstitutionChargeResource(ChargeResource):
     textual_rep = fields.CharField('getExtendedTextualRepresentation', readonly=True, null=True)
     location = fields.ForeignKey(LocationResource, 'location', null=True)
+
     class Meta(ChargeResource.Meta):
         queryset = OpInstitutionCharge.objects.using('politici').all()
         resource_name = 'cariche_istituzionali'
@@ -119,138 +120,110 @@ class PoliticianResource(ModelResource):
     political_charges = fields.ToManyField(PoliticalChargeResource, 'oppoliticalcharge_set', null=True)
     organization_charges = fields.ToManyField(OrganizationChargeResource, 'oporganizationcharge_set', null=True)
 
-    def build_filters(self, filters=None):
-        if filters is None:
-            filters = {}
-
-        orm_filters = super(PoliticianResource, self).build_filters(filters)
-
-        if "territorio" in filters:
-            # filtro per territorio
-            orm_filters['opinstitutioncharge__location__pk'] = filters["territorio"]
-        elif "tipo_territorio" in filters:
-            orm_filters['opinstitutioncharge__location__location_type_id'] = filters['tipo_territorio']
-
-        if "data" in filters:
-            if filters['data'] != 'all':
-                orm_filters['opinstitutioncharge__date_end__gte'] = filters['data']
-                orm_filters['opinstitutioncharge__date_start__lte'] = filters['data']
-        else:
-            orm_filters['opinstitutioncharge__date_end__isnull'] = True
-
-        if "istituzione" in filters:
-            orm_filters['opinstitutioncharge__institution__pk'] = filters['istituzione']
-
-        if "tipo_carica" in filters:
-            orm_filters['opinstitutioncharge__charge_type_id'] = filters['tipo_carica']
-
-        return orm_filters
-
     class Meta:
         queryset = OpPolitician.objects.using('politici').distinct()
         resource_name = 'politici'
         allowed_methods = ['get',]
 
-from tastypie.exceptions import NotFound
-from django.db.models import Count
-
-class DeputiesResource(Resource):
-
-    def get_resource_uri(self, bundle_or_obj=None, url_name='api_dispatch_list'):
-
-        base_url = '/politici/v2/politici/?format=json&territorio=%s' % bundle_or_obj.obj.pk
-
-#        charge_type
-#        1 Presidente
-#        2 Vicepresidente
-#        3 Commissario
-#        4 Presidente di commissione
-#        5 Deputato
-#        6 Senatore
-#        7 Presidente del Consiglio
-#        8 Vicepresidente del Consiglio
-#        9 Ministro
-#        10 Viceministro
-#        11 Sottosegretario
-#        12 Assessore
-#        13 Consigliere
-#        14 Sindaco
-#        15 Vicesindaco
-#        16 Commissario straordinario
-#        17 iscritto
-#        18 carica
-#        19 Presidente della Repubblica
-#        20 Senatore a vita
-#        21 Candidato per le Politiche del 2008
-
-#        institutions
-#        1 Commissione Europea
-#        2 Parlamento Europeo
-#        3 Governo Nazionale
-#        4 Camera dei Deputati
-#        5 Senato della Repubblica
-#        6 Giunta Regionale
-#        7 Consiglio Regionale
-#        8 Giunta Provinciale
-#        9 Consiglio Provinciale
-#        10 Giunta Comunale
-#        11 Consiglio Comunale
-#        12 Commissariamento
-#        13 Presidenza della Repubblica
 
 
-        deputati_url = "%s&tipo_carica=%s" % (base_url, 5)
-        senatori_url = "%s&tipo_carica=%s" % (base_url, 6)
+class InstitutionChargesField(fields.OneToManyField):
 
-        istituti = OpInstitution.objects.using('politici')
-
-        data = {
-            'Parlamento Europeo': "%s&istituzione=%s" % ( deputati_url, 2 ),
-            'Senato della Repubblica': "%s&istituzione=%s" % ( senatori_url, istituti.get(name='Senato della Repubblica').pk ),
-            'Camera dei Deputati': "%s&istituzione=%s" % ( deputati_url, istituti.get(name='Camera dei Deputati').pk ),
-            'Giunta Regionale' : '',
-            'Consiglio Regionale' : '',
-            'Giunta Provinciale' : '',
-            'Consiglio Provinciale' : '',
-            'Giunta Comunale' : '',
-            'Consiglio Comunale' : '',
+    def dehydrate_related(self, bundle, related_resource):
+        """
+        Based on the ``full_resource``, returns either the endpoint or the data
+        from ``full_dehydrate`` for the related resource.
+        """
+        return {
+            'description': "%s %s" % (bundle.obj.institution.name, bundle.obj.getExtendedTextualRepresentation()),
+            'institution_charge_uri': related_resource.get_resource_uri(bundle)
         }
 
+    @classmethod
+    def filtered_institution_charges(cls, bundle):
 
-#        istituzioni = OpInstitution.objects.using('politici')\
-#                        .order_by('priority')\
-#                        .filter(
-#                            opinstitutioncharge__date_end__isnull=True,
-#                            opinstitutioncharge__politician__death_date__isnull=True,
-#                        ).annotate(c=Count('opinstitutioncharge'))
-#
-#        if not bundle_or_obj:
-#            return istituzioni.all()
+        related_filters = DeputiesResource.build_prefixed_filters( bundle.request.GET )
 
-        data = {}
+        if 'custom' in related_filters:
+            custom = related_filters.pop('custom')
+            return bundle.obj.opinstitutioncharge_set.filter(custom, **related_filters )
+        else:
+            return bundle.obj.opinstitutioncharge_set.filter( **related_filters )
 
-        for istituzione in OpInstitution.objects.using('politici').order_by('priority'):
-            data[istituzione.name] = "%s&istituzione=%s" % (base_url,istituzione.pk)
+class DeputiesResource(ModelResource):
 
-        return data
-#        return url(r"^(?P<resource_name>%s)/(?P<slug>[\w\d_.-]+)/$" % self._meta.resource_name, self.wrap_view('dispatch_detail'), name="api_dispatch_detail")
-#        (r'^rappresentanti/(?P<location>[\w_\.-]+)/', include(entry_point_resource.urls)),
 
-    def obj_get_list(self, request=None, **kwargs):
-        # inner get of object list... this is where you'll need to
-        # fetch the data from what ever data source
-        raise NotFound("Scegli un territorio per vedere i suoi rappresentanti")
+    institution_charges = InstitutionChargesField(InstitutionChargeResource, lambda bundle: InstitutionChargesField.filtered_institution_charges(bundle), null=True)
 
-    def obj_get(self, request = None, **kwargs):
-        # get one object from data source
-        pk = int(kwargs['pk'])
-        try:
-            return OpLocation.objects.using('politici').get(pk=pk)
-        except KeyError:
-            raise NotFound("Object not found")
+    @classmethod
+    def build_prefixed_filters(cls, filters, prefix=''):
+
+        orm_filters = {}
+
+        if "data" not in filters:
+            orm_filters['{0}date_end__isnull'.format(prefix)] = True
+        elif filters['data'] != 'all':
+            orm_filters['{0}date_end__gte'.format(prefix)] = filters['data']
+            orm_filters['{0}date_start__lte'.format(prefix)] = filters['data']
+
+
+        if "territorio" in filters:
+            try:
+                city = OpLocation.objects.using('politici').comuni().get(pk=filters['territorio'])
+#                provincia = OpLocation.objects.using('politici').province().get(pk=filter['territorio'])
+            except (OpLocation.DoesNotExist, OpLocation.MultipleObjectsReturned):
+                raise NotFound("Invalid type of location")
+            qset = (
+                # consiglieri e assessori
+                Q(**{'{0}location_id__in'.format(prefix): (
+                    city.pk, # comunali
+                    city.getProvince().pk, # provinciali
+                    city.getRegion().pk # regionali
+                )})
+                # senato, camera e parlamento europeo
+                | Q(**{'{0}constituency_id__in'.format(prefix): [l.id for l in city.getConstituencies()]})
+                # governo nazionale e commissione europea
+                | Q(**{'{0}institution_id__in'.format(prefix): [1,3]})
+            )
+            orm_filters.update({
+                'custom': qset
+            })
+
+        if "istituzione" in filters:
+            orm_filters['{0}institution_id'.format(prefix)] = filters['istituzione']
+
+        if "tipo_carica" in filters:
+            orm_filters['{0}charge_type_id'.format(prefix)] = filters['tipo_carica']
+
+        return orm_filters
+
+    def dehydrate(self, bundle):
+
+        if bundle.obj.death_date:
+            bundle.data['death_date'] = bundle.obj.death_date
+
+        return bundle
+
+    def build_filters(self, filters=None):
+
+        orm_filters = super(DeputiesResource, self).build_filters(filters)
+
+        orm_filters.update( self.build_prefixed_filters( filters , prefix='opinstitutioncharge__') )
+
+        return orm_filters
+
+    def apply_filters(self, request, applicable_filters):
+        if 'custom' in applicable_filters:
+            custom = applicable_filters.pop('custom')
+            return self.get_object_list(request).filter(custom ,**applicable_filters)
+        else:
+            return self.get_object_list(request).filter(**applicable_filters)
+
 
     class Meta:
         resource_name = 'rappresentanti'
-        queryset = OpLocation.objects.using('politici').comuni()
+        queryset = OpPolitician.objects.using('politici').distinct().all()
+        ordering = ['last_name', 'first_name', 'birth_date']
         allowed_methods = ['get',]
+        fields = ['first_name', 'last_name', 'birth_date', 'birth_location', 'sex']
 
