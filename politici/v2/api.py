@@ -144,14 +144,15 @@ class InstitutionChargesField(fields.OneToManyField):
 
         related_filters = DeputiesResource.build_prefixed_filters( bundle.request.GET )
 
+        related_query = bundle.obj.opinstitutioncharge_set.select_related('constituency', 'charge_type', 'group', 'institution')
+
         if 'custom' in related_filters:
             custom = related_filters.pop('custom')
-            return bundle.obj.opinstitutioncharge_set.filter(custom, **related_filters )
+            return related_query.filter(custom, **related_filters )
         else:
-            return bundle.obj.opinstitutioncharge_set.filter( **related_filters )
+            return related_query.filter( **related_filters )
 
 class DeputiesResource(ModelResource):
-
 
     institution_charges = InstitutionChargesField(InstitutionChargeResource, lambda bundle: InstitutionChargesField.filtered_institution_charges(bundle), null=True)
 
@@ -169,8 +170,7 @@ class DeputiesResource(ModelResource):
 
         if "territorio" in filters:
             try:
-                city = OpLocation.objects.using('politici').comuni().get(pk=filters['territorio'])
-#                provincia = OpLocation.objects.using('politici').province().get(pk=filter['territorio'])
+                city = OpLocation.objects.using('politici').comune(filters['territorio'])
             except (OpLocation.DoesNotExist, OpLocation.MultipleObjectsReturned):
                 raise NotFound("Invalid type of location")
             qset = (
