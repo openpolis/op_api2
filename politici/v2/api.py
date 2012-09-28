@@ -142,18 +142,40 @@ class InstitutionChargesField(fields.OneToManyField):
     @classmethod
     def filtered_institution_charges(cls, bundle):
 
-        related_filters = DeputiesResource.build_prefixed_filters( bundle.request.GET )
+        if DeputiesResource._cached_politician_charges is None:
+            DeputiesResource._cached_politician_charges = {}
 
-        if 'custom' in related_filters:
-            custom = related_filters.pop('custom')
-            return bundle.obj.opinstitutioncharge_set.filter(custom, **related_filters )
-        else:
-            return bundle.obj.opinstitutioncharge_set.filter( **related_filters )
+            related_filters = DeputiesResource.build_prefixed_filters( bundle.request.GET )
+            # fill all extracted politician id to avoid multiple big queries
+            related_filters['politician_id__in'] = DeputiesResource._cached_politician_ids
+
+            query = None
+
+            if 'custom' in related_filters:
+                custom = related_filters.pop('custom')
+                query = OpInstitutionCharge.objects.using('politici').filter(custom, **related_filters )
+            else:
+                query = OpInstitutionCharge.objects.using('politici').filter( **related_filters )
+            # init cache for politician charges
+            for charge in query:
+                if charge.politician_id not in DeputiesResource._cached_politician_charges:
+                    DeputiesResource._cached_politician_charges[charge.politician_id] = []
+                DeputiesResource._cached_politician_charges[charge.politician_id].append(charge)
+
+
+
+#        related_filters = DeputiesResource.build_prefixed_filters( bundle.request.GET )
+#
+#        if 'custom' in related_filters:
+#            custom = related_filters.pop('custom')
+#            return bundle.obj.opinstitutioncharge_set.filter(custom, **related_filters )
+#        else:
+#            return bundle.obj.opinstitutioncharge_set.filter( **related_filters )
 
 class DeputiesResource(ModelResource):
 
 
-    institution_charges = InstitutionChargesField(InstitutionChargeResource, lambda bundle: InstitutionChargesField.filtered_institution_charges(bundle), null=True)
+#    institution_charges = InstitutionChargesField(InstitutionChargeResource, lambda bundle: InstitutionChargesField.filtered_institution_charges(bundle), null=True)
 
     @classmethod
     def build_prefixed_filters(cls, filters, prefix=''):
@@ -218,6 +240,91 @@ class DeputiesResource(ModelResource):
             return self.get_object_list(request).filter(custom ,**applicable_filters)
         else:
             return self.get_object_list(request).filter(**applicable_filters)
+
+    def alter_list_data_to_serialize(self, request, data):
+
+        # takes all politician id
+        politician_ids = [o.obj.content_id for o in data['objects']]
+
+        related_filters = DeputiesResource.build_prefixed_filters( request.GET )
+        # fill all extracted politician id to avoid multiple big queries
+        related_filters['politician_id__in'] = politician_ids
+
+        args_filters = []
+        if 'custom' in related_filters:
+            args_filters.append( related_filters.pop('custom') )
+
+        related_resource = InstitutionChargeResource()
+
+        for charge in OpInstitutionCharge.objects.using('politici').filter(*args_filters, **related_filters ).select_related(
+            'constituency', 'location', 'party', 'charge_type', 'institution', 'content', 'group'
+        ):
+            for obj in data['objects']:
+                print obj.obj.content_id
+                if obj.obj.content_id == charge.politician_id:
+                    if 'institution_charges' not in obj.data:
+                        print 'init charges for %s' % obj.obj
+                        obj.data['institution_charges'] = []
+                    obj.data['institution_charges'].append({
+                        'description': "%s %s" % (charge.institution.name, charge.getExtendedTextualRepresentation()),
+                        'institution_charge_uri': related_resource.get_resource_uri( self.build_bundle(charge))
+                    })
+
+        return data
+#    _cached_politician_ids= []
+#    _cached_politician_charges= None
+#    def build_bundle(self, obj=None, data=None, request=None):
+#        # add to cache the politician id found
+#        DeputiesResource._cached_politician_ids.append(obj.pk)
+#
+#        return super(DeputiesResource, self).build_bundle(obj, data, request)
+#
+#    def full_dehydrate(self, bundle):
+#        """
+#        Given a bundle with an object instance, extract the information from it
+#        to populate the resource.
+#        """
+#        # Dehydrate each field.
+#        for field_name, field_object in self.fields.items():
+#            # A touch leaky but it makes URI resolution work.
+#            if getattr(field_object, 'dehydrated_type', None) == 'related':
+#                field_object.api_name = self._meta.api_name
+#                field_object.resource_name = self._meta.resource_name
+#
+#            bundle.data[field_name] = field_object.dehydrate(bundle)
+#
+#            # Check for an optional method to do further dehydration.
+#            method = getattr(self, "dehydrate_%s" % field_name, None)
+#
+#            if method:
+#                bundle.data[field_name] = method(bundle)
+#
+#        bundle = self.dehydrate(bundle)
+#        return bundle
+#
+#
+#    def get_list(self, request, **kwargs):
+#        """
+#        Returns a serialized list of resources.
+#
+#        Calls ``obj_get_list`` to provide the data, then handles that result
+#        set and serializes it.
+#
+#        Should return a HttpResponse (200 OK).
+#        """
+#        # TODO: Uncached for now. Invalidation that works for everyone may be
+#        #       impossible.
+#        objects = self.obj_get_list(request=request, **self.remove_api_resource_names(kwargs))
+#        sorted_objects = self.apply_sorting(objects, options=request.GET)
+#
+#        paginator = self._meta.paginator_class(request.GET, sorted_objects, resource_uri=self.get_resource_list_uri(), limit=self._meta.limit)
+#        to_be_serialized = paginator.page()
+#
+#        # Dehydrate the bundles in preparation for serialization.
+#        bundles = [self.build_bundle(obj=obj, request=request) for obj in to_be_serialized['objects']]
+#        to_be_serialized['objects'] = [self.full_dehydrate(bundle) for bundle in bundles]
+#        to_be_serialized = self.alter_list_data_to_serialize(request, to_be_serialized)
+#        return self.create_response(request, to_be_serialized)
 
 
     class Meta:
