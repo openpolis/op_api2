@@ -38,7 +38,7 @@ class OpLocationQuerySet(models.query.QuerySet):
 
 class OpLocationManager(models.Manager):
 
-    def get_query_set(self, *args, **kwargs):
+    def get_query_set(self):
         return OpLocationQuerySet(self.model, using=self._db)
 
     def regioni(self): return self.get_query_set().province()
