@@ -151,7 +151,7 @@ class DeputiesResource(ModelResource):
 
         if "territorio" in filters:
             try:
-                city = OpLocation.objects.using('politici').comuni().get(pk=filters['territorio'])
+                city = OpLocation.objects.using('politici').comune(filters['territorio'])
             except (OpLocation.DoesNotExist, OpLocation.MultipleObjectsReturned):
                 raise NotFound("Invalid type of location")
             qset = (

@@ -27,14 +27,34 @@ class OpLocationType(models.Model):
 
 class OpLocationQuerySet(models.query.QuerySet):
 
+    _cache = {}
+
     def regioni(self):
-        return self.filter(location_type_id=4)
+        return self.filter(location_type_id=OpLocation.REGION_TYPE_ID)
+
+    def regione(self, comune_or_provincia):
+        key = "regione_%s" % comune_or_provincia.regional_id
+        if key not in self._cache:
+            self._cache[key] = self.regioni().get(regional_id = comune_or_provincia.regional_id)
+        return self._cache[key]
 
     def province(self):
-        return self.filter(location_type_id=5)
+        return self.filter(location_type_id=OpLocation.PROVINCE_TYPE_ID)
+
+    def provincia(self, comune):
+        key = "provincia_%s" % comune.regional_id
+        if key not in self._cache:
+            self._cache[key] = self.province().get(provincial_id = comune.provincial_id)
+        return self._cache[key]
 
     def comuni(self):
-        return self.filter(location_type_id=6)
+        return self.filter(location_type_id=OpLocation.CITY_TYPE_ID)
+
+    def comune(self, id):
+        key = "comune_%s" % id
+        if key not in self._cache:
+            self._cache[key] = self.comuni().get(pk = id)
+        return self._cache[key]
 
 class OpLocationManager(models.Manager):
 
@@ -42,8 +62,11 @@ class OpLocationManager(models.Manager):
         return OpLocationQuerySet(self.model, using=self._db)
 
     def regioni(self): return self.get_query_set().province()
+    def regione(self, territorio): return self.get_query_set().regione(territorio)
     def province(self): return self.get_query_set().province()
+    def provincia(self, territorio): return self.get_query_set().provincia(territorio)
     def comuni(self): return self.get_query_set().province()
+    def comune(self, id): return self.get_query_set().comune(id)
 
     def retrieveFromId(self, id_type, city_id):
         """return OpLocation object from an ID (politici, istat or minint)"""
@@ -95,6 +118,11 @@ class OpLocationManager(models.Manager):
 
 
 class OpLocation(models.Model):
+
+    CITY_TYPE_ID = 6
+    PROVINCE_TYPE_ID = 5
+    REGION_TYPE_ID = 4
+
     id = models.IntegerField(primary_key=True)
     location_type = models.ForeignKey(OpLocationType)
     name = models.CharField(max_length=255, blank=True)
@@ -125,20 +153,24 @@ class OpLocation(models.Model):
       return self.name
     
     def getProvince(self):
-        if self.location_type.name != 'Comune':
+        if self.location_type_id != OpLocation.CITY_TYPE_ID:
             raise Exception("This method can be called only for cities")
-        return OpLocation.objects.db_manager('politici').get(
-            location_type__name='Provincia', 
-            provincial_id=self.provincial_id
-        )
+        return OpLocation.objects.using('politici').provincia( self )
+#        return OpLocation.objects.db_manager('politici').get(
+#            location_type__name='Provincia',
+#            provincial_id=self.provincial_id
+#        )
     
     def getRegion(self):
-        if self.location_type.name not in ('Comune','Provincia'):
-            raise Exception("This method can be called only for cities")
-        return OpLocation.objects.db_manager('politici').get(
-            provincial_id__isnull=True,
-            regional_id=self.regional_id
-        )
+        if self.location_type_id not in (OpLocation.CITY_TYPE_ID, OpLocation.PROVINCE_TYPE_ID):
+            raise Exception("This method can be called only for cities or provinces")
+        return OpLocation.objects.using('politici').regione( self )
+#        if self.location_type.name not in ('Comune','Provincia'):
+#            raise Exception("This method can be called only for cities")
+#        return OpLocation.objects.db_manager('politici').get(
+#            provincial_id__isnull=True,
+#            regional_id=self.regional_id
+#        )
     
     def getConstituencies(self, election_type=None, prov_id=None):
         """docstring for getConstituency"""
@@ -971,7 +1003,7 @@ class OpInstitutionCharge(models.Model):
             s += " %s %s " % (institution_name, self.location.name)
             
         else:
-            s += "%s" % (charge_type)
+            s += "%s" % charge_type
         
         
         # party, for executive charges
