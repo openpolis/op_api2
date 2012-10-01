@@ -18,9 +18,15 @@ class LocationResource(ModelResource):
     location_type = fields.ForeignKey(LocationTypeResource, 'location_type', full=True)
 
     def dehydrate(self, bundle):
-
-        if bundle.obj.location_type.pk == LocationResource.C:
-            bundle.data['death_date'] = bundle.obj.death_date
+        # add uri to list of rappresentanti filtered by city
+        if bundle.obj.location_type_id == OpLocation.CITY_TYPE_ID:
+            bundle.data['rappresentanti_uri'] = "%s/?territorio=%s" % (
+                self._build_reverse_url("api_dispatch_list", kwargs={
+                    'resource_name': DeputiesResource.Meta.resource_name,
+                    'api_name': self._meta.api_name,
+                }),
+                bundle.obj.pk
+            )
 
         return bundle
 
@@ -90,6 +96,18 @@ class ChargeResource(ModelResource):
         allowed_methods = ['get', ]
 
 class InstitutionResource(ModelResource):
+
+    def dehydrate(self, bundle):
+
+        bundle.data['rappresentanti_uri'] = "%s/?istituzione=%s" % (
+            self._build_reverse_url("api_dispatch_list", kwargs={
+                'resource_name': DeputiesResource.Meta.resource_name,
+                'api_name' : self._meta.api_name
+            }),
+            bundle.obj.pk
+        )
+
+        return bundle
 
     class Meta:
         queryset = OpInstitution.objects.using('politici').all()
@@ -256,8 +274,11 @@ class DeputiesResource(ModelResource):
         return data
 
     def get_detail(self, request, **kwargs):
-
-        raise NotImplementedError("Risorsa sconosciuta")
+        """
+        volontariamente lasciato implementato
+        n singolo rappresentante deve essere visualizzato attraverso i politici
+        """
+        raise NotImplementedError("Errore, risorsa sconosciuta")
 
 
     class Meta:
