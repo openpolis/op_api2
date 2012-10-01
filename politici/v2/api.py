@@ -1,5 +1,6 @@
 from django.db.models.query_utils import Q
 from tastypie import fields
+from tastypie.bundle import Bundle
 from tastypie.resources import ModelResource, ALL, ALL_WITH_RELATIONS, Resource
 from politici.models import OpLocation, OpLocationType, OpProfession, OpResources, OpPolitician, OpResourcesType, OpEducationLevel, OpInstitutionCharge, OpPoliticalCharge, OpOrganizationCharge, OpInstitution
 from tastypie.exceptions import NotFound
@@ -15,6 +16,20 @@ class LocationTypeResource(ModelResource):
 
 class LocationResource(ModelResource):
     location_type = fields.ForeignKey(LocationTypeResource, 'location_type', full=True)
+
+    def dehydrate(self, bundle):
+        # add uri to list of rappresentanti filtered by city
+        if bundle.obj.location_type_id == OpLocation.CITY_TYPE_ID:
+            bundle.data['rappresentanti_uri'] = "%s/?territorio=%s" % (
+                self._build_reverse_url("api_dispatch_list", kwargs={
+                    'resource_name': DeputiesResource.Meta.resource_name,
+                    'api_name': self._meta.api_name,
+                }),
+                bundle.obj.pk
+            )
+
+        return bundle
+
     class Meta:
         queryset = OpLocation.objects.using('politici').all()
         resource_name = 'territori'
@@ -82,6 +97,18 @@ class ChargeResource(ModelResource):
 
 class InstitutionResource(ModelResource):
 
+    def dehydrate(self, bundle):
+
+        bundle.data['rappresentanti_uri'] = "%s/?istituzione=%s" % (
+            self._build_reverse_url("api_dispatch_list", kwargs={
+                'resource_name': DeputiesResource.Meta.resource_name,
+                'api_name' : self._meta.api_name
+            }),
+            bundle.obj.pk
+        )
+
+        return bundle
+
     class Meta:
         queryset = OpInstitution.objects.using('politici').all()
         resource_name = 'istituzioni'
@@ -126,35 +153,7 @@ class PoliticianResource(ModelResource):
         allowed_methods = ['get',]
 
 
-
-class InstitutionChargesField(fields.OneToManyField):
-
-    def dehydrate_related(self, bundle, related_resource):
-        """
-        Based on the ``full_resource``, returns either the endpoint or the data
-        from ``full_dehydrate`` for the related resource.
-        """
-        return {
-            'description': "%s %s" % (bundle.obj.institution.name, bundle.obj.getExtendedTextualRepresentation()),
-            'institution_charge_uri': related_resource.get_resource_uri(bundle)
-        }
-
-    @classmethod
-    def filtered_institution_charges(cls, bundle):
-
-        related_filters = DeputiesResource.build_prefixed_filters( bundle.request.GET )
-
-        related_query = bundle.obj.opinstitutioncharge_set.select_related('constituency', 'charge_type', 'group', 'institution')
-
-        if 'custom' in related_filters:
-            custom = related_filters.pop('custom')
-            return related_query.filter(custom, **related_filters )
-        else:
-            return related_query.filter( **related_filters )
-
 class DeputiesResource(ModelResource):
-
-    institution_charges = InstitutionChargesField(InstitutionChargeResource, lambda bundle: InstitutionChargesField.filtered_institution_charges(bundle), null=True)
 
     @classmethod
     def build_prefixed_filters(cls, filters, prefix=''):
@@ -213,11 +212,73 @@ class DeputiesResource(ModelResource):
         return orm_filters
 
     def apply_filters(self, request, applicable_filters):
-        if 'custom' in applicable_filters:
-            custom = applicable_filters.pop('custom')
-            return self.get_object_list(request).filter(custom ,**applicable_filters)
+
+        filter_args = []
+
+        if 'custom' in applicable_filters: filter_args.append( applicable_filters.pop('custom') )
+
+        return self.get_object_list(request).filter(*filter_args ,**applicable_filters)
+
+
+    def get_resource_uri(self, bundle_or_obj):
+        """
+        Handles generating a resource URI for a single resource.
+
+        Uses the model's ``pk`` in order to create the URI.
+        """
+        kwargs = {
+            'resource_name': PoliticianResource.Meta.resource_name,
+            }
+
+        if isinstance(bundle_or_obj, Bundle):
+            kwargs['pk'] = bundle_or_obj.obj.pk
         else:
-            return self.get_object_list(request).filter(**applicable_filters)
+            kwargs['pk'] = bundle_or_obj.id
+
+        if self._meta.api_name is not None:
+            kwargs['api_name'] = self._meta.api_name
+
+        return self._build_reverse_url("api_dispatch_detail", kwargs=kwargs)
+
+    def alter_list_data_to_serialize(self, request, data):
+
+        # takes all politician id
+        politician_ids = [o.obj.content_id for o in data['objects']]
+
+        related_filters = DeputiesResource.build_prefixed_filters( request.GET )
+        # fill all extracted politician id to avoid multiple big queries
+        related_filters['politician_id__in'] = politician_ids
+
+        args_filters = []
+        if 'custom' in related_filters:
+            args_filters.append( related_filters.pop('custom') )
+
+        related_resource = InstitutionChargeResource()
+
+        for charge in OpInstitutionCharge.objects.using('politici').filter(*args_filters, **related_filters ).select_related(
+            'constituency', 'location', 'party', 'charge_type', 'institution', 'content', 'group'
+        ):
+            for obj in data['objects']:
+
+                if obj.obj.content_id == charge.politician_id:
+
+                    # initialize institution charges for this politician
+                    if 'institution_charges' not in obj.data: obj.data['institution_charges'] = []
+
+                    # add founded charge
+                    obj.data['institution_charges'].append({
+                        'description': "%s %s" % (charge.institution.name, charge.getExtendedTextualRepresentation()),
+                        'institution_charge_uri': related_resource.get_resource_uri( self.build_bundle(charge))
+                    })
+
+        return data
+
+    def get_detail(self, request, **kwargs):
+        """
+        volontariamente lasciato implementato
+        n singolo rappresentante deve essere visualizzato attraverso i politici
+        """
+        raise NotImplementedError("Errore, risorsa sconosciuta")
 
 
     class Meta:
