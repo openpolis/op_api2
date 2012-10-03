@@ -160,11 +160,21 @@ class DeputiesResource(ModelResource):
 
         orm_filters = {}
 
+        # removes deleted
+        orm_filters['{0}content__deleted_at__isnull'.format(prefix)] = True
+
         if "data" not in filters:
             orm_filters['{0}date_end__isnull'.format(prefix)] = True
         elif filters['data'] != 'all':
-            orm_filters['{0}date_end__gte'.format(prefix)] = filters['data']
-            orm_filters['{0}date_start__lte'.format(prefix)] = filters['data']
+            orm_filters['custom_date'] = (
+                Q(**{'{0}date_start__lte'.format(prefix): filters['data']}),
+                # and
+                    Q(**{'{0}date_end__gte'.format(prefix): filters['data']}) |
+                    # or
+                    Q(**{'{0}date_end__isnull'.format(prefix): True })
+            )
+#            orm_filters['{0}date_end__gte'.format(prefix)] = filters['data']
+#            orm_filters['{0}date_start__lte'.format(prefix)] = filters['data']
 
 
         if "territorio" in filters:
@@ -216,6 +226,7 @@ class DeputiesResource(ModelResource):
         filter_args = []
 
         if 'custom' in applicable_filters: filter_args.append( applicable_filters.pop('custom') )
+        if 'custom_date' in applicable_filters: filter_args.extend( applicable_filters.pop('custom_date') )
 
         return self.get_object_list(request).filter(*filter_args ,**applicable_filters)
 
@@ -252,6 +263,8 @@ class DeputiesResource(ModelResource):
         args_filters = []
         if 'custom' in related_filters:
             args_filters.append( related_filters.pop('custom') )
+        if 'custom_date' in related_filters:
+            args_filters.extend( related_filters.pop('custom_date') )
 
         related_resource = InstitutionChargeResource()
 

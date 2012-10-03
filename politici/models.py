@@ -25,124 +25,86 @@ class OpLocationType(models.Model):
       return self.name
 
 
-def memoize(function):
-    memo = {}
-    def wrapper(*args):
-        if args in memo:
-            return memo[args]
-        else:
-            rv = function(*args)
-            memo[args] = rv
-            return rv
-    return wrapper
-
 class OpLocationQuerySet(models.query.QuerySet):
 
     _cache = {}
+    def _location_query(self, method, key, key_field='pk'):
+        """ returns a get cached query"""
+        cache_key = "%s_by_%s_%s" % (method, key_field, key)
+        if cache_key not in OpLocationQuerySet._cache:
+            OpLocationQuerySet._cache[cache_key] = getattr(self, method)().get(**{key_field:key})
+        return OpLocationQuerySet._cache[cache_key]
+
 
     def regioni(self):
         return self.filter(location_type_id=OpLocation.REGION_TYPE_ID)
 
     def regione(self, id, codename='op'):
-        key = "regione_%s_%s" % (codename,id)
-        if key not in self._cache:
+        try:
+            return getattr(self, {
+                'op': 'regione_from_id',
+                'istat': 'regione_from_istat_id',
+            }[codename])( id )
+        except KeyError:
+            raise Exception("'%s' is invalid codename for location" % codename)
 
-            try:
-                self._cache[key] = getattr(self, {
-#                    'op': 'regione_from_id' if isinstance(id, (int,long)) else 'regione_from_name',
-                    'op': 'regione_from_id',
-                    'istat': 'regione_from_istat_id',
-                    #                    'minint': 'comune_from_minint_id'
-                }[codename])( id )
-            except KeyError:
-                raise Exception("'%s' is invalid codename for location" % codename)
-
-        return self._cache[key]
 
     def regione_from_location(self, comune_or_provincia):
         """return an OpLocation object that contains provided location"""
-        key = "regione_by_location_%s" % comune_or_provincia.regional_id
-        if key not in self._cache:
-            self._cache[key] = self.regioni().get(regional_id = comune_or_provincia.regional_id)
-        return self._cache[key]
+        return self._location_query('regioni', comune_or_provincia.regional_id, 'regional_id')
 
     def regione_from_id(self, id):
-        key = "regione_by_id_%s" % id
-        if key not in self._cache:
-            self._cache[key] = self.regioni().get(pk = id)
-        return self._cache[key]
+        """return an OpLocation region object from primary key"""
+        return self._location_query('regioni', id)
 
     def regione_from_istat_id(self, id):
-        """return an OpLocation object, from the istat regional_id"""
+        """return an OpLocation region object, from the istat regional_id"""
         return self.regioni().get(regional_id = id )
-
-#    def regione_from_name(self, name):
-#        """return an OpLocation object from name"""
-#        return self.regioni().get(name__iexact=name)
 
     def province(self):
         return self.filter(location_type_id=OpLocation.PROVINCE_TYPE_ID)
 
     def provincia(self, id, codename='op'):
-        key = "provincia_%s_%s" % (codename,id)
-        if key not in self._cache:
-
-            try:
-                self._cache[key] = getattr(self, {
-#                    'op': 'provincia_from_id' if isinstance(id, (int,long)) else 'provincia_from_name',
-                    'op': 'provincia_from_id',
-                    'istat': 'provincia_from_istat_id',
-#                    'minint': 'comune_from_minint_id'
-                }[codename])( id )
-            except KeyError:
-                raise Exception("'%s' is invalid codename for location" % codename)
-
-        return self._cache[key]
+        try:
+            return getattr(self, {
+                 'op': 'provincia_from_id',
+                 'istat': 'provincia_from_istat_id',
+             }[codename])( id )
+        except KeyError:
+            raise Exception("'%s' is invalid codename for location" % codename)
 
     def provincia_from_location(self, comune):
-        key = "provincia_by_location_%s" % comune.regional_id
-        if key not in self._cache:
-            self._cache[key] = self.province().get(provincial_id = comune.provincial_id)
-        return self._cache[key]
+        """return an OpLocation object that contains provided location"""
+        return self._location_query('province', comune.provincial_id, 'provincial_id')
 
     def provincia_from_id(self, id):
-        key = "provincia_by_id_%s" % id
-        if key not in self._cache:
-            self._cache[key] = self.province().get(pk = id)
-        return self._cache[key]
+        """return an OpLocation province object from primary key"""
+        return self._location_query('province', id)
 
     def provincia_from_istat_id(self, id):
         """return an OpLocation object, from the istat provincial_id"""
-        return self.province().get(provincial_id = id )
-
-#    def provincia_from_name(self, name):
-#        """return an OpLocation object from name"""
-#        return self.province().get(name__iexact=name)
+        return self._location_query('province', id, 'provincial_id')
 
     def comuni(self):
         return self.filter(location_type_id=OpLocation.CITY_TYPE_ID)
 
-#    def comune_from_name(self, name):
-#        """return an OpLocation object from name"""
-#        return self.comuni().get(name__iexact=name)
-
     def comune_from_id(self, id):
-        """return an OpLocation object from the openpolis id"""
-        return self.comuni().get(pk = id )
+        """return an OpLocation city object from primary key"""
+        return self._location_query('comuni', id)
 
     def comune_from_istat_id(self, id):
         """return an OpLocation object, from the istat city_id"""
-        return self.comuni().get(city_id = id )
+        return self._location_query('comuni', id, 'city_id')
 
-    def comune_from_minint_id(self, id):
+    def comune_from_minint_id(self, minint_id):
         """
         return an OpLocation object, from the minint codes
         minint codes is packed: 2A3A4A
         the argument length is validated
         codes are unpacked from the argument
         """
-        if len(id) != 9:
-            raise Exception('minint_id code must be exactly 9 characters long: %s is %s char-long' % (id, len(id),))
+        if len(minint_id) != 9:
+            raise Exception('minint_id code must be exactly 9 characters long: %s is %s char-long' % (id, len(minint_id),))
         regional_code = int(id[:2])
         provincial_code = int(id[2:5])
         city_code = int(id[5:])
@@ -152,20 +114,14 @@ class OpLocationQuerySet(models.query.QuerySet):
             minint_city_code=city_code)
 
     def comune(self, id, codename='op'):
-        key = "comune_%s_%s" % (codename,id)
-        if key not in self._cache:
-
-            try:
-                self._cache[key] = getattr(self, {
-#                    'op': 'comune_from_id' if isinstance(id, (int,long)) else 'comune_from_name',
-                    'op': 'comune_from_id',
-                    'istat': 'comune_from_istat_id',
-                    'minint': 'comune_from_minint_id'
-                }[codename])( id )
-            except KeyError:
-                raise Exception("'%s' is invalid codename for location" % codename)
-
-        return self._cache[key]
+        try:
+            return getattr(self, {
+                'op': 'comune_from_id',
+                'istat': 'comune_from_istat_id',
+                'minint': 'comune_from_minint_id'
+            }[codename])( id )
+        except KeyError:
+            raise Exception("'%s' is invalid codename for location" % codename)
 
 
 
@@ -178,83 +134,33 @@ class OpLocationManager(models.Manager):
     def regione(self, territorio, codename='op'): return self.get_query_set().regione(territorio, codename)
     def regione_from_id(self, id): return self.regione(id, codename='op')
     def regione_from_istat_id(self, id): return self.regione(id, codename='istat')
-#    def regione_from_name(self, territorio): return self.regione(territorio)
     def province(self): return self.get_query_set().province()
     def provincia(self, territorio, codename='op'): return self.get_query_set().provincia(territorio, codename)
     def provincia_from_id(self, id): return self.provincia(id, codename='op')
     def provincia_from_istat_id(self, id): return self.provincia(id, codename='istat')
-#    def provincia_from_name(self, territorio): return self.provincia(territorio)
     def comuni(self): return self.get_query_set().comuni()
     def comune(self, territorio_id, codename='op'): return self.get_query_set().comune(territorio_id, codename=codename)
     def comune_from_id(self, id): return self.comune(id, codename='op')
     def comune_from_istat_id(self, id): return self.comune(id, codename='istat')
     def comune_from_minint_id(self, id): return self.comune(id, codename='minint')
-#    def comune_from_name(self, territorio): return self.comune(territorio)
 
     def retrieve_by_type(self, location_type, location_id, codename='op'):
         if isinstance(location_type, (int,long)):
             if location_type == OpLocation.CITY_TYPE_ID:
                 return self.comune(location_id, codename=codename)
             if location_type == OpLocation.PROVINCE_TYPE_ID:
-                return self.comune(location_id)
+                return self.comune(location_id, codename=codename)
             if location_type == OpLocation.REGION_TYPE_ID:
-                return self.regione(location_id)
+                return self.regione(location_id, codename=codename)
         else:
             if location_type == 'regional':
-                return self.regione(location_id)
+                return self.regione(location_id, codename=codename)
             if location_type == 'provincial':
-                return self.provincia(location_id)
+                return self.provincia(location_id, codename=codename)
             elif location_type == 'city':
-                return self.comune(location_id, codename='op')
+                return self.comune(location_id, codename=codename)
 
         raise Exception('wrong location_type parameters %s not in (regional, provincial, city)' % location_type)
-
-#    def retrieveFromId(self, id_type, city_id):
-#        """return OpLocation object from an ID (politici, istat or minint)"""
-#        if id_type == 'op_id':
-#            return self.retrieveFromOpId(city_id)
-#        elif id_type == 'istat_id':
-#            return self.retrieveFromIstatId(city_id)
-#        elif id_type == 'minint_id':
-#            return self.retrieveFromMinintId(city_id)
-#        else:
-#            raise Exception('wrong id type: %s use op_id, istat_id or minint_id' % (id_type,))
-#
-#    def retrieveFromOpId(self, op_id):
-#        """return an OpLocation object from the openpolis id"""
-#        return self.get(pk=op_id, location_type__id=6)
-#
-#    def retrieveFromIstatId(self, city_id):
-#        """return an OpLocation object, from the istat city_id"""
-#        return self.get(city_id=city_id)
-#
-#    def retrieveFromMinintId(self, minint_id):
-#        """
-#        return an OpLocation object, from the minint codes
-#        minint codes is packed: 2A3A4A
-#        the argument length is validated
-#        codes are unpacked from the argument
-#        """
-#        if len(minint_id) != 9:
-#            raise Exception('minint_id code must be exactly 9 characters long: %s is %s char-long' % (minint_id, len(minint_id),))
-#        regional_code = int(minint_id[:2])
-#        provincial_code = int(minint_id[2:5])
-#        city_code = int(minint_id[5:])
-#        return self.get(minint_regional_code=regional_code,
-#            minint_provincial_code=provincial_code,
-#            minint_city_code=city_code)
-
-#    def getFromTypeId(self, location_type, location_id):
-#        if location_type == 'regional':
-#            locations = self.filter(location_type__name__iexact='regione', regional_id=location_id)
-#        elif location_type == 'provincial':
-#            locations = self.filter(location_type__name__iexact='provincia', provincial_id=location_id)
-#        elif location_type == 'city':
-#            locations = self.filter(location_type__name__iexact='comune', city_id=location_id)
-#        else:
-#            raise Exception('wrong location_type parameters %s not in (regional, provincial, city)' % location_type)
-#
-#        return locations[0]
 
 
 
