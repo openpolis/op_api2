@@ -1,4 +1,4 @@
-import os, sys
+import os
 # Django settings for op_api project.
 
 
@@ -80,7 +80,7 @@ STATICFILES_FINDERS = (
 )
 
 # Make this unique, and don't share it with anybody.
-SECRET_KEY = '#9t4l*(*g&20x*5jiyg2jom3$q(e-*keim3ftalb4bsnyjm_qf'
+SECRET_KEY = '***** CHANGEME ******'
 
 # List of callables that know how to import templates from various sources.
 TEMPLATE_LOADERS = (

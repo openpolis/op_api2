@@ -1,0 +1,23 @@
+import settings
+
+settings.SECRET_KEY = "**** KEY ****"
+settings.LANGUAGE_CODE = 'it-IT'
+
+settings.DATABASES = {
+    'default': {
+        'NAME': 'op_api2_auth.sqlite',
+        'ENGINE': 'django.db.backends.sqlite3',
+        },
+    'parlamento': {
+        'NAME': 'op_openparlamento',
+        'ENGINE': 'django.db.backends.mysql',
+        'USER': 'USERNAME',
+        'PASSWORD': 'PASSWORD'
+    },
+    'politici': {
+        'NAME': 'op_openpolis',
+        'ENGINE': 'django.db.backends.mysql',
+        'USER': 'USERNAME',
+        'PASSWORD': 'PASSWORD'
+    }
+}

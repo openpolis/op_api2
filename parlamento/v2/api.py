@@ -4,6 +4,7 @@ from tastypie.bundle import Bundle
 from tastypie.constants import ALL
 from tastypie.resources import Resource, ModelResource
 from parlamento.models import OppActHistoryCache
+from api_auth import PrivateResourceMeta
 
 
 class CacheDateObject(object):
@@ -32,7 +33,7 @@ class ActCacheDatesResource(Resource):
     data_count = fields.IntegerField(attribute='data_count', default=0)
     acts_url = fields.CharField(attribute='acts_url')
 
-    class Meta:
+    class Meta(PrivateResourceMeta):
         resource_name = 'history/dates'
         include_resource_uri = False
         object_class = CacheDateObject
@@ -62,7 +63,7 @@ class ActCacheDatesResource(Resource):
 
 
 class ActCacheResource(ModelResource):
-    class Meta:
+    class Meta(PrivateResourceMeta):
         queryset = OppActHistoryCache.objects.using('parlamento')
         resource_name = 'history/acts'
         allowed_methods = ['get']

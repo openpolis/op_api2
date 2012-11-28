@@ -1,18 +1,22 @@
 from django.db.models.query_utils import Q
 from tastypie import fields
 from tastypie.bundle import Bundle
-from tastypie.resources import ModelResource, ALL, ALL_WITH_RELATIONS, Resource
+from tastypie.resources import ModelResource, ALL, ALL_WITH_RELATIONS
 from politici.models import OpLocation, OpLocationType, OpProfession, OpResources, OpPolitician, OpResourcesType, OpEducationLevel, OpInstitutionCharge, OpPoliticalCharge, OpOrganizationCharge, OpInstitution
 from tastypie.exceptions import NotFound
+from api_auth import PrivateResourceMeta
+
+
 
 class LocationTypeResource(ModelResource):
-    class Meta:
+    class Meta(PrivateResourceMeta):
         queryset = OpLocationType.objects.using('politici').all()
         resource_name = 'tipi_territori'
         allowed_methods = ['get',]
         filtering = {
             'name': ALL,
         }
+
 
 class LocationResource(ModelResource):
     location_type = fields.ForeignKey(LocationTypeResource, 'location_type', full=True)
@@ -30,7 +34,7 @@ class LocationResource(ModelResource):
 
         return bundle
 
-    class Meta:
+    class Meta(PrivateResourceMeta):
         queryset = OpLocation.objects.using('politici').all()
         resource_name = 'territori'
         allowed_methods = ['get',]
@@ -38,7 +42,6 @@ class LocationResource(ModelResource):
             'location_type': ALL_WITH_RELATIONS,
             'name': ALL,
         }
-
 
 
 
@@ -51,13 +54,14 @@ class EducationLevelResource(ModelResource):
             return '/politici/v2/%s/%s/' % (self._meta.resource_name,bundle_or_obj.obj.education_level.pk)
         else:
             return '/politici/v2/%s/%s/' % (self._meta.resource_name,bundle_or_obj.obj.pk)
-    class Meta:
+    class Meta(PrivateResourceMeta):
         queryset = OpEducationLevel.objects.using('politici').all()
         resource_name = 'education_level'
         allowed_methods = ['get',]
 
+
 class ProfessionResource(ModelResource):
-    class Meta:
+    class Meta(PrivateResourceMeta):
         queryset = OpProfession.objects.using('politici').all()
         resource_name = 'professioni'
         allowed_methods = ['get',]
@@ -68,7 +72,7 @@ class ProfessionResource(ModelResource):
 
 
 class ResourceTypeResource(ModelResource):
-    class Meta:
+    class Meta(PrivateResourceMeta):
         queryset = OpResourcesType.objects.using('politici').all()
         resource_name = 'denominazione'
         allowed_methods = ['get', ]
@@ -79,11 +83,10 @@ class ResourceResource(ModelResource):
     def get_resource_uri(self, bundle_or_obj):
         return '/politici/v2/%s/%s/' % (self._meta.resource_name,bundle_or_obj.obj.content.pk)
 
-    class Meta:
+    class Meta(PrivateResourceMeta):
         queryset = OpResources.objects.using('politici').all()
         resource_name = 'risorse'
         allowed_methods = ['get', ]
-
 
 
 class ChargeResource(ModelResource):
@@ -92,8 +95,9 @@ class ChargeResource(ModelResource):
     def get_resource_uri(self, bundle_or_obj):
         return '/politici/v2/%s/%s/' % (self._meta.resource_name,bundle_or_obj.obj.content.pk)
 
-    class Meta:
+    class Meta(PrivateResourceMeta):
         allowed_methods = ['get', ]
+
 
 class InstitutionResource(ModelResource):
 
@@ -109,12 +113,13 @@ class InstitutionResource(ModelResource):
 
         return bundle
 
-    class Meta:
+    class Meta(PrivateResourceMeta):
         queryset = OpInstitution.objects.using('politici').all()
         resource_name = 'istituzioni'
         excludes = ['priority','short_name']
         allowed_methods = ['get']
         ordering = ['priority']
+
 
 class InstitutionChargeResource(ChargeResource):
     textual_rep = fields.CharField('getExtendedTextualRepresentation', readonly=True, null=True)
@@ -128,16 +133,19 @@ class InstitutionChargeResource(ChargeResource):
             'location': ALL_WITH_RELATIONS,
         }
 
+
 class PoliticalChargeResource(ChargeResource):
     location = fields.ForeignKey(LocationResource, 'location', null=True)
     class Meta(ChargeResource.Meta):
         queryset = OpPoliticalCharge.objects.using('politici').all()
         resource_name = 'cariche_politiche'
 
+
 class OrganizationChargeResource(ChargeResource):
     class Meta(ChargeResource.Meta):
         queryset = OpOrganizationCharge.objects.using('politici').all()
         resource_name = 'cariche_organizzazioni'
+
 
 class PoliticianResource(ModelResource):
     profession = fields.ForeignKey(ProfessionResource, 'profession', null=True)
@@ -147,7 +155,7 @@ class PoliticianResource(ModelResource):
     political_charges = fields.ToManyField(PoliticalChargeResource, 'oppoliticalcharge_set', null=True)
     organization_charges = fields.ToManyField(OrganizationChargeResource, 'oporganizationcharge_set', null=True)
 
-    class Meta:
+    class Meta(PrivateResourceMeta):
         queryset = OpPolitician.objects.using('politici').distinct()
         resource_name = 'politici'
         allowed_methods = ['get',]
@@ -167,10 +175,10 @@ class DeputiesResource(ModelResource):
             orm_filters['{0}date_end__isnull'.format(prefix)] = True
         elif filters['data'] != 'all':
             orm_filters['custom_date'] = (
+                # start_date is lower then ...
                 Q(**{'{0}date_start__lte'.format(prefix): filters['data']}),
-                # and
+                # and date_end is greater then or null
                     Q(**{'{0}date_end__gte'.format(prefix): filters['data']}) |
-                    # or
                     Q(**{'{0}date_end__isnull'.format(prefix): True })
             )
 #            orm_filters['{0}date_end__gte'.format(prefix)] = filters['data']
@@ -294,7 +302,7 @@ class DeputiesResource(ModelResource):
         raise NotImplementedError("Errore, risorsa sconosciuta")
 
 
-    class Meta:
+    class Meta(PrivateResourceMeta):
         resource_name = 'rappresentanti'
         queryset = OpPolitician.objects.using('politici').distinct().all()
         ordering = ['last_name', 'first_name', 'birth_date']
