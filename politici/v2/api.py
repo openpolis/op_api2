@@ -117,7 +117,7 @@ class InstitutionResource(ModelResource):
 
     def dehydrate(self, bundle):
 
-        bundle.data['rappresentanti_uri'] = "%s/?istituzione=%s" % (
+        bundle.data['rappresentanti_uri'] = "%s?istituzione=%s" % (
             self._build_reverse_url("api_dispatch_list", kwargs={
                 'resource_name': DeputiesResource.Meta.resource_name,
                 'api_name' : self._meta.api_name
