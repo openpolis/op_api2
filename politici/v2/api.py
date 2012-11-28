@@ -9,10 +9,22 @@ from api_auth import PrivateResourceMeta
 
 
 class LocationTypeResource(ModelResource):
+    def dehydrate(self, bundle):
+        # add uri to list of locations filtered by location_type
+        bundle.data['territori_uri'] = "%s?location_type=%s" % (
+            self._build_reverse_url("api_dispatch_list", kwargs={
+                'resource_name': LocationResource.Meta.resource_name,
+                'api_name': self._meta.api_name,
+                }),
+            bundle.obj.pk
+        )
+
+        return bundle
     class Meta(PrivateResourceMeta):
         queryset = OpLocationType.objects.using('politici').all()
         resource_name = 'tipi_territori'
         allowed_methods = ['get',]
+        include_resource_uri = False
         filtering = {
             'name': ALL,
         }
