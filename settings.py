@@ -119,6 +119,7 @@ INSTALLED_APPS = (
     'django.contrib.staticfiles',
     'django_extensions',
     'tastypie',
+    'territori',
     'parlamento',
     'politici',
     # Uncomment the next line to enable the admin:
