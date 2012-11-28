@@ -90,8 +90,10 @@ class ResourceResource(ModelResource):
 
 
 class ChargeResource(ModelResource):
+    id = fields.IntegerField('pk')
     politician = fields.ForeignKey('politici.v2.api.PoliticianResource', 'politician', full=True)
     textual_rep = fields.CharField('getTextualRepresentation', readonly=True, null=True)
+
     def get_resource_uri(self, bundle_or_obj):
         return '/politici/v2/%s/%s/' % (self._meta.resource_name,bundle_or_obj.obj.content.pk)
 
@@ -123,7 +125,12 @@ class InstitutionResource(ModelResource):
 
 class InstitutionChargeResource(ChargeResource):
     textual_rep = fields.CharField('getExtendedTextualRepresentation', readonly=True, null=True)
-    location = fields.ForeignKey(LocationResource, 'location', null=True)
+    location = fields.CharField('location__name', null=True)
+    location_id = fields.CharField('location__pk', null=True)
+    institution = fields.ForeignKey(InstitutionResource, 'institution', full=True)
+    group = fields.CharField('group__name', readonly=True, null=True)
+    party = fields.CharField('party__name', readonly=True, null=True)
+    charge_type = fields.CharField('charge_type__name', readonly=True, null=True)
 
     class Meta(ChargeResource.Meta):
         queryset = OpInstitutionCharge.objects.using('politici').all()
@@ -135,7 +142,10 @@ class InstitutionChargeResource(ChargeResource):
 
 
 class PoliticalChargeResource(ChargeResource):
-    location = fields.ForeignKey(LocationResource, 'location', null=True)
+    location = fields.CharField('location__name', null=True)
+    location_id = fields.CharField('location__pk', null=True)
+    party = fields.CharField('party__name', readonly=True, null=True)
+    charge_type = fields.CharField('charge_type__name', readonly=True, null=True)
     class Meta(ChargeResource.Meta):
         queryset = OpPoliticalCharge.objects.using('politici').all()
         resource_name = 'cariche_politiche'
