@@ -6,3 +6,4 @@ class PrivateResourceMeta():
 
     authentication = BasicAuthentication()
     authorization = DjangoAuthorization()
+    allowed_methods = ['get',]

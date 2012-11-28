@@ -7,7 +7,6 @@ from politici.models import OpProfession, OpResources, OpPolitician, OpResources
 from tastypie.exceptions import NotFound
 from api_auth import PrivateResourceMeta
 
-
 class EducationLevelResource(ModelResource):
     def get_resource_uri(self, bundle_or_obj):
         """
@@ -20,7 +19,7 @@ class EducationLevelResource(ModelResource):
     class Meta(PrivateResourceMeta):
         queryset = OpEducationLevel.objects.using('politici').all()
         resource_name = 'education_level'
-        allowed_methods = ['get',]
+        include_resource_uri = False
 
 
 class ProfessionResource(ModelResource):
@@ -32,13 +31,13 @@ class ProfessionResource(ModelResource):
             'oid': ALL,
             'description': ALL,
             }
+        include_resource_uri = False
 
 
 class ResourceTypeResource(ModelResource):
     class Meta(PrivateResourceMeta):
         queryset = OpResourcesType.objects.using('politici').all()
         resource_name = 'denominazione'
-        allowed_methods = ['get', ]
 
 
 class ResourceResource(ModelResource):
@@ -49,19 +48,14 @@ class ResourceResource(ModelResource):
     class Meta(PrivateResourceMeta):
         queryset = OpResources.objects.using('politici').all()
         resource_name = 'risorse'
-        allowed_methods = ['get', ]
 
 
 class ChargeResource(ModelResource):
     id = fields.IntegerField('pk')
-    politician = fields.ForeignKey('politici.v2.api.PoliticianResource', 'politician', full=True)
     textual_rep = fields.CharField('getTextualRepresentation', readonly=True, null=True)
 
     def get_resource_uri(self, bundle_or_obj):
         return '/politici/v2/%s/%s/' % (self._meta.resource_name,bundle_or_obj.obj.content.pk)
-
-    class Meta(PrivateResourceMeta):
-        allowed_methods = ['get', ]
 
 
 class InstitutionResource(ModelResource):
@@ -82,40 +76,43 @@ class InstitutionResource(ModelResource):
         queryset = OpInstitution.objects.using('politici').all()
         resource_name = 'istituzioni'
         excludes = ['priority','short_name']
-        allowed_methods = ['get']
         ordering = ['priority']
+        include_resource_uri = False
 
 
 class InstitutionChargeResource(ChargeResource):
+    politician = fields.ForeignKey('politici.v2.api.PoliticianResource', 'politician', full=True)
     textual_rep = fields.CharField('getExtendedTextualRepresentation', readonly=True, null=True)
     location = fields.CharField('location__name', null=True)
-    location_id = fields.CharField('location__pk', null=True)
+    location_id = fields.IntegerField('location__pk', null=True)
     institution = fields.ForeignKey(InstitutionResource, 'institution', full=True)
     group = fields.CharField('group__name', readonly=True, null=True)
     party = fields.CharField('party__name', readonly=True, null=True)
     charge_type = fields.CharField('charge_type__name', readonly=True, null=True)
 
-    class Meta(ChargeResource.Meta):
+    class Meta(PrivateResourceMeta):
         queryset = OpInstitutionCharge.objects.using('politici').all()
         resource_name = 'cariche_istituzionali'
         filtering = {
             'date_end': ALL,
             'location': ALL_WITH_RELATIONS,
-        }
+            }
 
 
 class PoliticalChargeResource(ChargeResource):
+    politician = fields.ForeignKey('politici.v2.api.PoliticianResource', 'politician', full=True)
     location = fields.CharField('location__name', null=True)
     location_id = fields.CharField('location__pk', null=True)
     party = fields.CharField('party__name', readonly=True, null=True)
     charge_type = fields.CharField('charge_type__name', readonly=True, null=True)
-    class Meta(ChargeResource.Meta):
+    class Meta(PrivateResourceMeta):
         queryset = OpPoliticalCharge.objects.using('politici').all()
         resource_name = 'cariche_politiche'
 
 
 class OrganizationChargeResource(ChargeResource):
-    class Meta(ChargeResource.Meta):
+    politician = fields.ForeignKey('politici.v2.api.PoliticianResource', 'politician', full=True)
+    class Meta(PrivateResourceMeta):
         queryset = OpOrganizationCharge.objects.using('politici').all()
         resource_name = 'cariche_organizzazioni'
 
@@ -131,7 +128,7 @@ class PoliticianResource(ModelResource):
     class Meta(PrivateResourceMeta):
         queryset = OpPolitician.objects.using('politici').distinct()
         resource_name = 'politici'
-        allowed_methods = ['get',]
+        excludes = ['is_indexed',]
 
 
 class DeputiesResource(ModelResource):
@@ -241,6 +238,7 @@ class DeputiesResource(ModelResource):
         # fill all extracted politician id to avoid multiple big queries
         related_filters['politician_id__in'] = politician_ids
 
+        # args_filters may contains a Q objects
         args_filters = []
         if 'custom' in related_filters:
             args_filters.append( related_filters.pop('custom') )
@@ -279,6 +277,5 @@ class DeputiesResource(ModelResource):
         resource_name = 'rappresentanti'
         queryset = OpPolitician.objects.using('politici').distinct().all()
         ordering = ['last_name', 'first_name', 'birth_date']
-        allowed_methods = ['get',]
         fields = ['first_name', 'last_name', 'birth_date', 'birth_location', 'sex']
 
