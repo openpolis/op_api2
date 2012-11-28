@@ -2,14 +2,8 @@ from tastypie import fields
 from tastypie.constants import ALL, ALL_WITH_RELATIONS
 from tastypie.resources import ModelResource
 from api_auth import PrivateResourceMeta
-from politici.v2.api import DeputiesResource
+import politici.v2.api
 from territori.models import OpLocation, OpLocationType
-
-class LocationsResourceMeta(PrivateResourceMeta):
-    """
-    Generic Meta class for all Resource in politici.v2.api
-    """
-    allowed_methods = ['get',]
 
 
 class LocationTypeResource(ModelResource):
@@ -24,7 +18,8 @@ class LocationTypeResource(ModelResource):
             )
 
         return bundle
-    class Meta(LocationsResourceMeta):
+
+    class Meta(PrivateResourceMeta):
         queryset = OpLocationType.objects.using('politici').all()
         resource_name = 'tipi_territori'
         include_resource_uri = False
@@ -37,11 +32,14 @@ class LocationResource(ModelResource):
     location_type = fields.ForeignKey(LocationTypeResource, 'location_type', full=True)
 
     def dehydrate(self, bundle):
+        # build a fullname
+        bundle.data['full_name'] = unicode(bundle.obj)
+
         # add uri to list of rappresentanti filtered by city
         if bundle.obj.location_type_id == OpLocation.CITY_TYPE_ID:
-            bundle.data['rappresentanti_uri'] = "%s/?territorio=%s" % (
+            bundle.data['rappresentanti_uri'] = "%s?territorio=%s" % (
                 self._build_reverse_url("api_dispatch_list", kwargs={
-                    'resource_name': DeputiesResource.Meta.resource_name,
+                    'resource_name': politici.v2.api.DeputiesResource.Meta.resource_name,
                     'api_name': self._meta.api_name,
                     }),
                 bundle.obj.pk
@@ -49,7 +47,7 @@ class LocationResource(ModelResource):
 
         return bundle
 
-    class Meta(LocationsResourceMeta):
+    class Meta(PrivateResourceMeta):
         queryset = OpLocation.objects.using('politici').all()
         resource_name = 'territori'
         filtering = {

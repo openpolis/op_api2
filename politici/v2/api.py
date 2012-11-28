@@ -41,13 +41,19 @@ class ResourceTypeResource(ModelResource):
 
 
 class ResourceResource(ModelResource):
-    resource_type = fields.ForeignKey(ResourceTypeResource, 'resources_type', full=True)
+    description = fields.CharField('descrizione', null=True)
+    type = fields.CharField('resources_type__denominazione', null=True)
+    external_uri = fields.CharField('valore', null=True)
+
+#    resource_type = fields.ForeignKey(ResourceTypeResource, 'resources_type', full=True)
     def get_resource_uri(self, bundle_or_obj):
         return '/politici/v2/%s/%s/' % (self._meta.resource_name,bundle_or_obj.obj.content.pk)
 
     class Meta(PrivateResourceMeta):
         queryset = OpResources.objects.using('politici').all()
         resource_name = 'risorse'
+        include_resource_uri = False
+        excludes = ['descrizione','valore'] # rename above
 
 
 class ChargeResource(ModelResource):
@@ -83,8 +89,9 @@ class InstitutionResource(ModelResource):
 class InstitutionChargeResource(ChargeResource):
     politician = fields.ForeignKey('politici.v2.api.PoliticianResource', 'politician', full=True)
     textual_rep = fields.CharField('getExtendedTextualRepresentation', readonly=True, null=True)
-    location = fields.CharField('location__name', null=True)
+    location_uri = fields.ForeignKey('territori.v2.api.LocationResource', 'location', null=True)
     location_id = fields.IntegerField('location__pk', null=True)
+    location_name = fields.CharField('location__name', null=True)
     institution = fields.ForeignKey(InstitutionResource, 'institution', full=True)
     group = fields.CharField('group__name', readonly=True, null=True)
     party = fields.CharField('party__name', readonly=True, null=True)
@@ -124,6 +131,47 @@ class PoliticianResource(ModelResource):
     institution_charges = fields.ToManyField(InstitutionChargeResource, 'opinstitutioncharge_set', null=True)
     political_charges = fields.ToManyField(PoliticalChargeResource, 'oppoliticalcharge_set', null=True)
     organization_charges = fields.ToManyField(OrganizationChargeResource, 'oporganizationcharge_set', null=True)
+
+    def get_detail(self, request, **kwargs):
+        """
+        display more information on detail request
+        """
+
+        self.fields['profession'].full = True
+        self.fields['resources'].full = True
+
+        for charge_type in ['institution_charges', 'political_charges', 'organization_charges']:
+
+            self.fields[charge_type].full = True
+            # remove politician to avoid recursion
+            if 'politician' in self.fields[charge_type].to.base_fields:
+                del self.fields[charge_type].to.base_fields['politician']
+            elif 'politician' in self.fields[charge_type].to.declared_fields:
+                del self.fields[charge_type].to.declared_fields['politician']
+
+
+        return super(PoliticianResource, self).get_detail(request, **kwargs)
+
+    def dehydrate(self, bundle):
+
+        # build a fullname
+        bundle.data['full_name'] = unicode(bundle.obj)
+
+        if bundle.data['education_levels']:
+            bundle.data['education_levels'] = []
+            for educationLevel in bundle.obj.oppoliticianhasopeducationlevel_set.all():
+                bundle.data['education_levels'].append( {
+                    'name': educationLevel.education_level.getNormalizedDescription(),
+                    'description': educationLevel.description,
+                    } )
+
+        if bundle.data['profession']:
+            bundle.data['profession'] = {
+                'name': bundle.obj.profession.description,
+                'description': bundle.obj.profession.getNormalizedDescription(),
+            }
+
+        return bundle
 
     class Meta(PrivateResourceMeta):
         queryset = OpPolitician.objects.using('politici').distinct()
@@ -250,18 +298,23 @@ class DeputiesResource(ModelResource):
         for charge in OpInstitutionCharge.objects.using('politici').filter(*args_filters, **related_filters ).select_related(
             'constituency', 'location', 'party', 'charge_type', 'institution', 'content', 'group'
         ):
-            for obj in data['objects']:
+            for bundle in data['objects']:
 
-                if obj.obj.content_id == charge.politician_id:
+                # build a fullname
+                bundle.data['full_name'] = unicode(bundle.obj)
 
+                if bundle.obj.content_id == charge.politician_id:
                     # initialize institution charges for this politician
-                    if 'institution_charges' not in obj.data: obj.data['institution_charges'] = []
+                    if 'institution_charges' not in bundle.data: bundle.data['institution_charges'] = []
 
-                    # add founded charge
-                    obj.data['institution_charges'].append({
-                        'description': "%s %s" % (charge.institution.name, charge.getExtendedTextualRepresentation()),
-                        'institution_charge_uri': related_resource.get_resource_uri( self.build_bundle(charge))
-                    })
+                    # remove politician to avoid recursion
+                    if 'politician' in related_resource.fields:
+                        del related_resource.fields['politician']
+                    elif 'politician' in related_resource.declared_fields:
+                        del related_resource.declared_fields['politician']
+
+                    charge_bundle = related_resource.build_bundle(obj=charge, request=request)
+                    bundle.data['institution_charges'].append( related_resource.full_dehydrate( charge_bundle ) )
 
         return data
 
@@ -277,5 +330,5 @@ class DeputiesResource(ModelResource):
         resource_name = 'rappresentanti'
         queryset = OpPolitician.objects.using('politici').distinct().all()
         ordering = ['last_name', 'first_name', 'birth_date']
-        fields = ['first_name', 'last_name', 'birth_date', 'birth_location', 'sex']
+#        fields = ['first_name', 'last_name', 'birth_date', 'birth_location', 'sex']
 

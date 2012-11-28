@@ -187,16 +187,16 @@ class OpLocation(models.Model):
         managed = False
 
     def __unicode__(self):
-        bits = []
+        bits = [self.name]
         if self.location_type_id == OpLocation.CITY_TYPE_ID:
-            bits.append(u'Città di')
+            bits.insert(0,u'Comune di')
+            bits.append(u'(%s)' % self.prov)
         elif self.location_type_id == OpLocation.PROVINCE_TYPE_ID:
-            bits.append(u'Provincia di')
+            bits.insert(0,u'Provincia di')
         elif self.location_type_id == OpLocation.REGION_TYPE_ID:
-            bits.append(u'Regione')
-        bits.append(self.name)
+            bits.insert(0,u'Regione')
 
-        return " ".join(bits)
+        return u" ".join(bits)
 
     @property
     def minint_id(self):
@@ -232,7 +232,7 @@ class OpLocation(models.Model):
             prov_id = self.getProvince().id
 
         kwargs = {
-            'politici_models.OpConstituencylocation__location_id': prov_id
+            'opconstituencylocation__location_id': prov_id
         }
         if election_type:
             if isinstance(election_type, (int,long)):

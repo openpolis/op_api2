@@ -229,6 +229,9 @@ class OpPolitician(models.Model):
             })
             
         return charges
+
+    def __unicode__(self):
+        return "{} {}".format(self.first_name, self.last_name).title()
     
 
 
