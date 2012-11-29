@@ -3,7 +3,7 @@ from tastypie import fields
 from tastypie.bundle import Bundle
 from tastypie.resources import ModelResource, ALL, ALL_WITH_RELATIONS
 from territori.models import OpLocation, OpLocationType
-from politici.models import OpProfession, OpResources, OpPolitician, OpResourcesType, OpEducationLevel, OpInstitutionCharge, OpPoliticalCharge, OpOrganizationCharge, OpInstitution
+from politici.models import OpProfession, OpResources, OpPolitician, OpResourcesType, OpEducationLevel, OpInstitutionCharge, OpPoliticalCharge, OpOrganizationCharge, OpInstitution, OpChargeType
 from tastypie.exceptions import NotFound
 from api_auth import PrivateResourceMeta
 
@@ -46,8 +46,8 @@ class ResourceResource(ModelResource):
     external_uri = fields.CharField('valore', null=True)
 
 #    resource_type = fields.ForeignKey(ResourceTypeResource, 'resources_type', full=True)
-    def get_resource_uri(self, bundle_or_obj):
-        return '/politici/v2/%s/%s/' % (self._meta.resource_name,bundle_or_obj.obj.content.pk)
+#    def get_resource_uri(self, bundle_or_obj):
+#        return '/politici/v2/%s/%s/' % (self._meta.resource_name,bundle_or_obj.obj.content.pk)
 
     class Meta(PrivateResourceMeta):
         queryset = OpResources.objects.using('politici').all()
@@ -62,6 +62,27 @@ class ChargeResource(ModelResource):
 
     def get_resource_uri(self, bundle_or_obj):
         return '/politici/v2/%s/%s/' % (self._meta.resource_name,bundle_or_obj.obj.content.pk)
+
+
+class ChargeTypeResource(ModelResource):
+
+    def dehydrate(self, bundle):
+        # add uri to list of rappresentanti filtered by tipo_carica
+        bundle.data['rappresentanti_uri'] = "%s?tipo_carica=%s" % (
+            self._build_reverse_url("api_dispatch_list", kwargs={
+                'resource_name': DeputiesResource.Meta.resource_name,
+                'api_name': self._meta.api_name,
+                }),
+            bundle.obj.pk
+            )
+        return bundle
+
+    class Meta(PrivateResourceMeta):
+        queryset = OpChargeType.objects.using('politici').all()
+        resource_name = 'cariche'
+        include_resource_uri = False
+        ordering = ['priority']
+        excludes = ['priority']
 
 
 class InstitutionResource(ModelResource):
