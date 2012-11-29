@@ -14,7 +14,7 @@ Resource URI
 
 ::
 
-    /politici/v2/territori/
+    /territori/v2/territori/
 
 Resource Properties
 *******************
@@ -54,7 +54,7 @@ Resource URI
 
 ::
 
-    /politici/v2/tipi_territori/
+    /territori/v2/tipi_territori/
 
 ============================= ==========================================================
 property                      explanation
