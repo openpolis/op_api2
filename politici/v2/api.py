@@ -55,13 +55,26 @@ class ResourceResource(ModelResource):
         include_resource_uri = False
         excludes = ['descrizione','valore'] # rename above
 
+class InstitutionResource(ModelResource):
 
-class ChargeResource(ModelResource):
-    id = fields.IntegerField('pk')
-    textual_rep = fields.CharField('getTextualRepresentation', readonly=True, null=True)
+    def dehydrate(self, bundle):
 
-    def get_resource_uri(self, bundle_or_obj):
-        return '/politici/v2/%s/%s/' % (self._meta.resource_name,bundle_or_obj.obj.content.pk)
+        bundle.data['rappresentanti_uri'] = "%s?istituzione=%s" % (
+            self._build_reverse_url("api_dispatch_list", kwargs={
+                'resource_name': DeputiesResource.Meta.resource_name,
+                'api_name' : self._meta.api_name
+            }),
+            bundle.obj.pk
+            )
+
+        return bundle
+
+    class Meta(PrivateResourceMeta):
+        queryset = OpInstitution.objects.using('politici').all()
+        resource_name = 'istituzioni'
+        excludes = ['priority','short_name']
+        ordering = ['priority']
+        include_resource_uri = False
 
 
 class ChargeTypeResource(ModelResource):
@@ -85,38 +98,33 @@ class ChargeTypeResource(ModelResource):
         excludes = ['priority']
 
 
-class InstitutionResource(ModelResource):
+class ChargeResource(ModelResource):
+    id = fields.IntegerField('pk')
+    textual_rep = fields.CharField('getTextualRepresentation', readonly=True, null=True)
 
-    def dehydrate(self, bundle):
-
-        bundle.data['rappresentanti_uri'] = "%s?istituzione=%s" % (
-            self._build_reverse_url("api_dispatch_list", kwargs={
-                'resource_name': DeputiesResource.Meta.resource_name,
-                'api_name' : self._meta.api_name
-            }),
-            bundle.obj.pk
-        )
-
-        return bundle
-
-    class Meta(PrivateResourceMeta):
-        queryset = OpInstitution.objects.using('politici').all()
-        resource_name = 'istituzioni'
-        excludes = ['priority','short_name']
-        ordering = ['priority']
-        include_resource_uri = False
+    def get_resource_uri(self, bundle_or_obj):
+        return '/politici/v2/%s/%s/' % (getattr(self,'_meta').resource_name,bundle_or_obj.obj.content.pk)
 
 
-class InstitutionChargeResource(ChargeResource):
+class LocalizedChargeResource(ChargeResource):
+    charge_type = fields.ForeignKey(ChargeTypeResource, 'charge_type', null=True, full=True)
+    location = fields.ForeignKey('territori.v2.api.LocationResource', 'location', null=True)
+    location_id = fields.IntegerField('location__pk', null=True)
+    location_name = fields.CharField('location', null=True)
+
+    def get_detail(self, request, **kwargs):
+
+        self.fields['location'].full = True
+
+        return super(LocalizedChargeResource, self).get_detail(request, **kwargs)
+
+
+class InstitutionChargeResource(LocalizedChargeResource):
     politician = fields.ForeignKey('politici.v2.api.PoliticianResource', 'politician', full=True)
     textual_rep = fields.CharField('getExtendedTextualRepresentation', readonly=True, null=True)
-    location_uri = fields.ForeignKey('territori.v2.api.LocationResource', 'location', null=True)
-    location_id = fields.IntegerField('location__pk', null=True)
-    location_name = fields.CharField('location__name', null=True)
     institution = fields.ForeignKey(InstitutionResource, 'institution', full=True)
     group = fields.CharField('group__name', readonly=True, null=True)
     party = fields.CharField('party__name', readonly=True, null=True)
-    charge_type = fields.CharField('charge_type__name', readonly=True, null=True)
 
     class Meta(PrivateResourceMeta):
         queryset = OpInstitutionCharge.objects.using('politici').all()
@@ -124,18 +132,22 @@ class InstitutionChargeResource(ChargeResource):
         filtering = {
             'date_end': ALL,
             'location': ALL_WITH_RELATIONS,
+            'charge_type': ALL,
             }
 
 
-class PoliticalChargeResource(ChargeResource):
+class PoliticalChargeResource(LocalizedChargeResource):
     politician = fields.ForeignKey('politici.v2.api.PoliticianResource', 'politician', full=True)
-    location = fields.CharField('location__name', null=True)
-    location_id = fields.CharField('location__pk', null=True)
     party = fields.CharField('party__name', readonly=True, null=True)
-    charge_type = fields.CharField('charge_type__name', readonly=True, null=True)
+
     class Meta(PrivateResourceMeta):
         queryset = OpPoliticalCharge.objects.using('politici').all()
         resource_name = 'cariche_politiche'
+        filtering = {
+            'date_end': ALL,
+            'location': ALL_WITH_RELATIONS,
+            'charge_type': ALL,
+        }
 
 
 class OrganizationChargeResource(ChargeResource):
@@ -143,6 +155,10 @@ class OrganizationChargeResource(ChargeResource):
     class Meta(PrivateResourceMeta):
         queryset = OpOrganizationCharge.objects.using('politici').all()
         resource_name = 'cariche_organizzazioni'
+        filtering = {
+            'date_end': ALL,
+            'charge_name': ALL,
+        }
 
 
 class PoliticianResource(ModelResource):
@@ -351,5 +367,13 @@ class DeputiesResource(ModelResource):
         resource_name = 'rappresentanti'
         queryset = OpPolitician.objects.using('politici').distinct().all()
         ordering = ['last_name', 'first_name', 'birth_date']
+        excludes = ['is_indexed','death_date']
+        filtering = {
+            'birth_date': ALL,
+            'sex': ('exact',),
+            'last_name': ALL,
+            'first_name': ALL,
+            'death_date': ALL,
+        }
 #        fields = ['first_name', 'last_name', 'birth_date', 'birth_location', 'sex']
 
