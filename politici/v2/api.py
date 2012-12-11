@@ -363,7 +363,7 @@ class DeputiesResource(ModelResource):
         raise NotImplementedError("Errore, risorsa sconosciuta")
 
 
-    class Meta(PrivateResourceMeta):
+    class Meta():
         resource_name = 'rappresentanti'
         queryset = OpPolitician.objects.using('politici').distinct().all()
         ordering = ['last_name', 'first_name', 'birth_date']
