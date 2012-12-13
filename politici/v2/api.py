@@ -262,10 +262,18 @@ class DeputiesResource(ModelResource):
             })
 
         if "istituzione" in filters:
-            orm_filters['{0}institution_id'.format(prefix)] = filters['istituzione']
+            istituzione_pks = filters['istituzione'].split(',')
+            if len(istituzione_pks) == 1:
+                orm_filters['{0}institution_id'.format(prefix)] = istituzione_pks[0]
+            else:
+                orm_filters['{0}institution_id__in'.format(prefix)] = istituzione_pks
 
         if "tipo_carica" in filters:
-            orm_filters['{0}charge_type_id'.format(prefix)] = filters['tipo_carica']
+            tipo_carica_pks = filters['tipo_carica'].split(',')
+            if len(tipo_carica_pks) == 1:
+                orm_filters['{0}charge_type_id'.format(prefix)] = tipo_carica_pks[0]
+            else:
+                orm_filters['{0}charge_type_id__in'.format(prefix)] = tipo_carica_pks
 
         return orm_filters
 
