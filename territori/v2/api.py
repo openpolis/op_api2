@@ -53,4 +53,6 @@ class LocationResource(ModelResource):
         filtering = {
             'location_type': ALL_WITH_RELATIONS,
             'name': ALL,
+            'regional_id': ALL,
+            'provincial_id': ALL,
             }
